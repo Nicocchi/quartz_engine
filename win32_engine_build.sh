@@ -41,21 +41,18 @@ UWhite='\033[4;37m'       # White
 ########################################
 build_dir="build/win64"
 
-# rm -rf $build_dir
 mkdir -p $build_dir
-# mkdir -p $build_dir/assets
 
 ########################################
 # ENGINE                               #
 ########################################
-printf "Compiling engine =======\n"
+printf "======= Compiling Engine =======\n"
 rm -f $build_dir/quartz.*
 libs="-luser32 -lopengl32 -lgdi32 -lengine/lib/glfw3dll -lengine/lib/freetype"
 flags=""
 warnings="-Wno-writable-strings -Wno-format-security -Wno-deprecated-declarations -Wno-switch"
 includes="-Iengine/src/editor/ -Iengine/src/renderer -Iengine/src/"
-vendor_includes="-Ivendor/ -Iengine/vendor/imgui/ -Ivendor/glfw -Ivendor/raylib"
-# src="engine/src/main.cpp"
+vendor_includes="-Ivendor/ -Iengine/vendor/imgui/ -Ivendor/glfw"
 src="engine/src/win32_main.cpp"
 defines="-DSHOW_EDITOR=1"
 target="quartz"
@@ -73,27 +70,3 @@ if [ $duration_ms -ge 1000 ]; then
 else
     printf "${Green} Engine compilation time: ${UGreen}${duration_ms} ms ${NC}\n\n"
 fi
-
-########################################
-# GAME                                 #
-########################################
-printf "Compiling game =======\n"
-src="engine/src/game.cpp"
-timestamp=$(date +%s)
-
-rm -f $build_dir/game_*
-start_time=$(date +%s%N)
-
-clang++ $includes $vendor_includes -g $src -shared -o $build_dir/game_$timestamp.dll $warnings
-
-end_time=$(date +%s%N)
-duration_ns=$((end_time - start_time))
-duration_ms=$((duration_ns / 1000000))
-
-if [ $duration_ms -ge 1000 ]; then
-    printf "${Green} Game compilation time: ${URed}${duration_ms} ms ${NC}\n\n"
-else
-    printf "${Green} Game compilation time: ${UGreen}${duration_ms} ms ${NC}\n\n"
-fi
-
-mv $build_dir/game_$timestamp.dll $build_dir/game.dll
