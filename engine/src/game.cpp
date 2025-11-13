@@ -42,15 +42,11 @@
 
 void game_init(game_memory *GameMemory);
 
-float currentFrameTime = 0;
-int currentFrameIndex = 0;
-
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     game_state *state = (game_state*)GameMemory->storage;
     render_context *render_state = (render_context*)GameMemory->renderStorage;
 
-    currentFrameTime += deltaTime;
 
     if (!GameMemory->isInit)
     {
@@ -63,7 +59,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         render_command draw_texture;
         draw_texture.type = DRAW_TEXTURE;
         draw_texture.id = state->entities[i].id;
-        draw_texture.texture = state->entities[i].texture;
+        draw_texture.texture = state->entities[i].sprite.texture;
 
         Vector2 pos = state->entities[i].transform.position;
         Vector2 esize = state->entities[i].transform.size;
@@ -71,78 +67,74 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
         vertex *v = &render_state->vertices[render_state->vertexCount];
 
-        float tw = float(state->entities[i].width) / state->entities[i].texture_width;
-        float th = float(state->entities[i].height) / state->entities[i].texture_height;
-        int width = state->entities[i].width;
-        int twidth = state->entities[i].texture_width;
+        // Sprite animation
+        float tw = float(state->entities[i].animated_sprite.cell_width) / state->entities[i].animated_sprite.texture_width;
+        float th = float(state->entities[i].animated_sprite.cell_height) / state->entities[i].animated_sprite.texture_height;
+        int width = state->entities[i].animated_sprite.cell_width;
+        int twidth = state->entities[i].animated_sprite.texture_width;
         int numPerRow = twidth / width;
 
-        int frame = state->entities[i].frameIndex;
+        state->entities[i].animated_sprite.current_duration += deltaTime;
 
-        if (frame > state->entities[i].endFrame)
-        {
-            frame = state->entities[i].startFrame;
-            state->entities[i].frameIndex = frame;
-        }
 
-        if (currentFrameTime >= state->entities[i].frameDuration)
+
+        if (state->entities[i].animated_sprite.current_duration >= state->entities[i].animated_sprite.frame_duration)
         {
-            currentFrameTime = 0.0f;
-            state->entities[i].frameIndex++;
+            state->entities[i].animated_sprite.current_duration = 0.0f;
+            state->entities[i].animated_sprite.frame_index++;
+
+            if (state->entities[i].animated_sprite.frame_index > state->entities[i].animated_sprite.end_frame)
+            {
+                state->entities[i].animated_sprite.frame_index = state->entities[i].animated_sprite.start_frame;
+            }
         }
         
-        // if (frame > state->entities[i].endFrame)
-        // {
-        //     frame = state->entities[i].startFrame;
-        //     state->entities[i].startFrame;
-        // }
-
+        int frame = state->entities[i].animated_sprite.frame_index;
+        
         float tx = (frame % numPerRow) * tw;
         float ty = 1.0f - ((frame / numPerRow) + 1) * th;
 
-        // state->entities[i].frameIndex++;
-
-        tx += state->entities[i].texture_offsetX;
-        ty += state->entities[i].texture_offsetY;
+        tx += state->entities[i].animated_sprite.offset_x;
+        ty += state->entities[i].animated_sprite.offset_y;
 
         v[0].position = pos;
         // Top-left
         v[0].texCoords.x = tx;
         v[0].texCoords.y = ty + th;
-        v[0].color.x = state->entities[i].color.x;
-        v[0].color.y = state->entities[i].color.y;
-        v[0].color.z = state->entities[i].color.z;
-        v[0].color.w = state->entities[i].color.w;
+        v[0].color.x = state->entities[i].sprite.color.x;
+        v[0].color.y = state->entities[i].sprite.color.y;
+        v[0].color.z = state->entities[i].sprite.color.z;
+        v[0].color.w = state->entities[i].sprite.color.w;
 
         v[1].position.x = pos.x + esize.x;
         v[1].position.y = pos.y;
         // Top-right
         v[1].texCoords.x = tx + tw;
         v[1].texCoords.y = ty + th;
-        v[1].color.x = state->entities[i].color.x;
-        v[1].color.y = state->entities[i].color.y;
-        v[1].color.z = state->entities[i].color.z;
-        v[1].color.w = state->entities[i].color.w;
+        v[1].color.x = state->entities[i].sprite.color.x;
+        v[1].color.y = state->entities[i].sprite.color.y;
+        v[1].color.z = state->entities[i].sprite.color.z;
+        v[1].color.w = state->entities[i].sprite.color.w;
 
         v[2].position.x = pos.x + esize.x;
         v[2].position.y = pos.y + esize.y;
         // Bottom-right
         v[2].texCoords.x = tx + tw;
         v[2].texCoords.y = ty;
-        v[2].color.x = state->entities[i].color.x;
-        v[2].color.y = state->entities[i].color.y;
-        v[2].color.z = state->entities[i].color.z;
-        v[2].color.w = state->entities[i].color.w;
+        v[2].color.x = state->entities[i].sprite.color.x;
+        v[2].color.y = state->entities[i].sprite.color.y;
+        v[2].color.z = state->entities[i].sprite.color.z;
+        v[2].color.w = state->entities[i].sprite.color.w;
 
         v[3].position.x = pos.x;
         v[3].position.y = pos.y + esize.y;
         // Bottom-left
         v[3].texCoords.x = tx;
         v[3].texCoords.y = ty;
-        v[3].color.x = state->entities[i].color.x;
-        v[3].color.y = state->entities[i].color.y;
-        v[3].color.z = state->entities[i].color.z;
-        v[3].color.w = state->entities[i].color.w;
+        v[3].color.x = state->entities[i].sprite.color.x;
+        v[3].color.y = state->entities[i].sprite.color.y;
+        v[3].color.z = state->entities[i].sprite.color.z;
+        v[3].color.w = state->entities[i].sprite.color.w;
 
 
         if (rotation != 0)
@@ -241,27 +233,32 @@ void game_init(game_memory *GameMemory)
     entity.transform.position.y = -91;
     entity.transform.size.x = 240.0f;
     entity.transform.size.y = 240.0f;
-    entity.frameIndex = 12;
-    entity.texture_width = 96;
-    entity.texture_height = 96;
-    entity.texture_offsetX = 0.0f;
-    entity.texture_offsetY = 0.0f;
-    entity.width = 24;
-    entity.height = 24;
-    entity.maxFrames = 16;
-    entity.startFrame = 12;
-    entity.endFrame = 15;
-    entity.frameDuration = 1.0f;
+
+    entity.sprite.texture = new Texture2D();
+    entity.sprite.texture->isLoadedGPU = false;
+    entity.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    entity.animated_sprite.frame_index = 12;
+    entity.animated_sprite.texture_width = 96;
+    entity.animated_sprite.texture_height = 96;
+    entity.animated_sprite.offset_x = 0.0f;
+    entity.animated_sprite.offset_y = 0.0f;
+    entity.animated_sprite.cell_width = 24;
+    entity.animated_sprite.cell_height = 24;
+    entity.animated_sprite.max_frames = 16;
+    entity.animated_sprite.start_frame = 12;
+    entity.animated_sprite.end_frame = 15;
+    entity.animated_sprite.frame_duration = 0.25f;
+    
     entity.transform.rotation = 0.0f;
-    entity.texture = new Texture2D();
-    entity.texture->isLoadedGPU = false;
-    entity.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    // entity.texture = new Texture2D();
+    // entity.texture->isLoadedGPU = false;
     // entity.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
     render_command load_texture;
     load_texture.type = UPLOAD;
     load_texture.filePath = "assets/textures/FD_Character_007_Idle.png";
-    load_texture.texture = entity.texture;
+    load_texture.texture = entity.sprite.texture;
     render_state->render_commands.push(load_texture);
 
     state->entities.push_back(entity);

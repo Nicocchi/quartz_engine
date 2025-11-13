@@ -88,24 +88,46 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         ImGui::Text(state->entities[state->selected_entity].name);
 
         ImVec2 available_size = ImGui::GetContentRegionAvail();
-        float w_width = available_size.x * 0.5f;
+        float w_width = available_size.x / 2.5;
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Spacing();
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            // ImGui::DragFloat("drag small float", &f2, 0.0001f, 0.0f, 0.0f, "%.06f ns");
             ImGui::Text("Position");
             ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity X", &state->entities[state->selected_entity].transform.position.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
+            
             ImGui::SameLine();
-            ImGui::PushItemWidth(w_width - 8.0f);
+            ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity Y", &state->entities[state->selected_entity].transform.position.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
+            
+            ImGui::SameLine();
+            ImGui::PushItemWidth(w_width - 8.0f);
+            ImGui::PushID("ResetEntityPos");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
 
             ImGui::Text("Rotation");
-            ImGui::PushItemWidth(available_size.x);
+            ImGui::PushItemWidth(available_size.x / 2.5);
             ImGui::DragFloat("##Entity Rotation", &state->entities[state->selected_entity].transform.rotation, 0.01f, -4.0f, 4.0f, "Rotation: %.02f");
             ImGui::PopItemWidth();
 
+            ImGui::SameLine();
+            ImGui::PushItemWidth(w_width - 8.0f);
+            ImGui::PushID("ResetEntityRotation");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
             // ImGui::Text("Scale");
             // ImGui::PushItemWidth(w_width);
             // ImGui::DragFloat("##Entity Scale X", &state->entities[state->selected_entity].transform.scale.x, 0.01f, 0.0f, 0.0f, "X: %.02f");
@@ -120,31 +142,36 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::DragFloat("##Entity Size X", &state->entities[state->selected_entity].transform.size.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
             ImGui::SameLine();
-            ImGui::PushItemWidth(w_width - 8.0f);
+            ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity Size Y", &state->entities[state->selected_entity].transform.size.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
+            
+            ImGui::SameLine();
+            ImGui::PushItemWidth(w_width - 8.0f);
+            ImGui::PushID("ResetEntitySize");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
         }
 
         
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Spacing();
         if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("Frame Index");
-            ImGui::SameLine();
-            ImGui::PushItemWidth(available_size.x);
-            ImGui::DragInt("##Entity FrameIndex", &state->entities[state->selected_entity].frameIndex, 1.0f, 0.0f, state->entities[state->selected_entity].maxFrames - 1);
 
-            ImGui::Text("Frame Duration");
-            ImGui::SameLine();
-            ImGui::DragFloat("##Entity Frame Duration", &state->entities[state->selected_entity].frameDuration, 1.0f, 0.0f, 0.0f, "%.02f");
-
-             // Generate a default palette. The palette will persist and can be edited.
-            ImVec4 color = Vec4ToImVec4(state->entities[state->selected_entity].color);
+            ImVec4 color = Vec4ToImVec4(state->entities[state->selected_entity].sprite.color);
 
             ImGuiColorEditFlags base_flags = ImGuiColorEditFlags_None;
             static bool saved_palette_init = true;
             static ImVec4 saved_palette[32] = {};
             static ImVec4 backup_color;
 
+             // Generate a default palette. The palette will persist and can be edited.
             if (saved_palette_init)
             {
                 for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
@@ -168,7 +195,6 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             {
                 ImGui::OpenPopup("mypicker");
                 backup_color = color;
-                // backup_color = Vec4ToImVec4(state->entities[state->selected_entity].color);
             }
             popup_opened_last_frame = open_popup;
             if (ImGui::BeginPopup("mypicker"))
@@ -177,7 +203,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                 ImGui::Separator();
                 if (ImGui::ColorPicker4("##picker", (float*)&color, base_flags | ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar))
                 {
-                    state->entities[state->selected_entity].color = ImVec4ToVec4(color);
+                    state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
                 }
                 ImGui::SameLine();
     
@@ -202,7 +228,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                         
                         // entity_color = ImVec4ToVec4(ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w))
                         color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
-                        state->entities[state->selected_entity].color = ImVec4ToVec4(color);
+                        state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
                     }
     
                     // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
@@ -228,6 +254,73 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         }
     }
 
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::AlignTextToFramePadding();
+    bool enable_animated_sprite = true;
+
+    bool as_open = ImGui::CollapsingHeader("##Animated Sprite", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+    ImGui::SameLine();
+    ImGui::Checkbox("##EnableAnimatedSprite", &enable_animated_sprite);
+    ImGui::SameLine();
+    ImGui::Text("Animated Sprite");
+    if (as_open)
+    {
+        ImVec2 available_size = ImGui::GetContentRegionAvail();
+        ImGui::Text("Current Frame: %d", state->entities[state->selected_entity].animated_sprite.frame_index);
+            //ImGui::SameLine();
+            //ImGui::PushItemWidth(available_size.x);
+            //ImGui::DragInt("##Entity FrameIndex", &state->entities[state->selected_entity].animated_sprite.frame_index, 1.0f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames - 1);
+
+            ImGui::Text("Frame Duration");
+            ImGui::PushItemWidth(available_size.x / 2.5f);
+            ImGui::DragFloat("##Entity Frame Duration", &state->entities[state->selected_entity].animated_sprite.frame_duration, 0.01f, 0.0f, 1.0f, "%.02f");
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 2.5f);
+            ImGui::PushID("ResetAnimatedSpriteDuration");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+            
+            ImGui::Text("Frame Range");
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##Entity Start Frame", &state->entities[state->selected_entity].animated_sprite.start_frame, 1.0f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames);
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::PushID("ResetAnimatedSpriteStart");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##Entity End Frame", &state->entities[state->selected_entity].animated_sprite.end_frame, 0.01f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames);
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::PushID("ResetAnimatedSpriteEnd");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+    }
+    
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
     if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // ImGui::DragFloat("drag small float", &f2, 0.0001f, 0.0f, 0.0f, "%.06f ns");

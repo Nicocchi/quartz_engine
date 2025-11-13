@@ -18,7 +18,10 @@ TIMESTAMP := $(shell date +"%s")
 .PHONY: engine game
 
 engine:
+	rm -rf $(BUILD_DIR)/$(TARGET).*
 	$(CXX) $(CXX_STD) $(DEFINES) $(INCLUDES) $(VENDOR_INC) -g $(SRC) -o $(BUILD_DIR)/$(TARGET).exe $(LIBS) $(WARNINGS) $(PCH)
 
 game:
+	rm -rf $(BUILD_DIR)/game*
 	$(CXX) $(CXX_STD) $(INCLUDES)  -g engine/src/game.cpp -shared -o $(BUILD_DIR)/game_$(TIMESTAMP).dll $(WARNINGS)
+	mv $(BUILD_DIR)/game_$(TIMESTAMP).dll $(BUILD_DIR)/game.dll

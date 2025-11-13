@@ -8,22 +8,36 @@ struct Transform
     float rotation = 0.0f;
 };
 
+struct Sprite
+{
+    Texture2D *texture;
+    Vector4 color;
+};
+
+struct AnimatedSprite
+{
+    int cell_width, cell_height;
+    int texture_width, texture_height;
+    int frame_index;
+    int start_frame;
+    int end_frame;
+    int max_frames;
+    float frame_duration;
+    float current_duration;
+    float offset_x;
+    float offset_y;
+};
+
 struct Entity
 {
     unsigned int id;
-    Texture2D *texture;
+    //Texture2D *texture;
     Transform transform;
+    Sprite sprite;
+    AnimatedSprite animated_sprite;
     char *name;
     size_t vertexOffset = 0; // index into the shared vertex buffer
     // glm::vec2 velocity;
-    int width, height;
-    int texture_width, texture_height;
-    int frameIndex;
-    int startFrame;
-    int endFrame;
-    int maxFrames;
-    float frameDuration;
-    float texture_offsetX;
-    float texture_offsetY;
-    Vector4 color;
+    
+    // Vector4 color;
 };
