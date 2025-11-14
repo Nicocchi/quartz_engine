@@ -383,7 +383,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             
             ImGui::Text("Frame Range");
             ImGui::PushItemWidth(available_size.x / 3.5f);
-            ImGui::DragInt("##Entity Start Frame", &state->entities[state->selected_entity].animated_sprite.start_frame, 1.0f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames);
+            ImGui::DragInt("##Entity Start Frame", &state->entities[state->selected_entity].animated_sprite.start_frame, 1, 0, state->entities[state->selected_entity].animated_sprite.max_frames);
             ImGui::PopItemWidth();
             ImGui::SameLine();
             ImGui::PushItemWidth(available_size.x / 3.5f);
@@ -397,11 +397,47 @@ void show_editor(render_context *context, int fps, game_memory *GM)
 
             ImGui::SameLine();
             ImGui::PushItemWidth(available_size.x / 3.5f);
-            ImGui::DragInt("##Entity End Frame", &state->entities[state->selected_entity].animated_sprite.end_frame, 0.01f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames);
+            ImGui::DragInt("##Entity End Frame", &state->entities[state->selected_entity].animated_sprite.end_frame, 1, 0, state->entities[state->selected_entity].animated_sprite.max_frames);
             ImGui::PopItemWidth();
             ImGui::SameLine();
             ImGui::PushItemWidth(available_size.x / 3.5f);
             ImGui::PushID("ResetAnimatedSpriteEnd");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+            
+            ImGui::Text("Cell Size");
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##EntityCellSizeX", &state->entities[state->selected_entity].animated_sprite.cell_width, 1, 0, 0,"X: %d");
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##EntityCellSizeY", &state->entities[state->selected_entity].animated_sprite.cell_height, 1, 0, 0, "Y: %d");
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::PushID("ResetEntityCellSize");
+            if (ImGui::Button("Reset"))
+            {
+
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+            
+            ImGui::Text("Texture Size");
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##EntityTextureSizeX", &state->entities[state->selected_entity].animated_sprite.texture_width, 1, 0, 0,"W: %d");
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::DragInt("##EntityTextureSizeY", &state->entities[state->selected_entity].animated_sprite.texture_height, 1, 0, 0, "H: %d");
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(available_size.x / 3.5f);
+            ImGui::PushID("ResetEntityTextureSize");
             if (ImGui::Button("Reset"))
             {
 
