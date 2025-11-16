@@ -5,6 +5,51 @@ static bool opt_padding = false;
 static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
 ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 
+// Converts a std::filesystem string into a std::string
+std::string canonical_to_string(const std::filesystem::path &p)
+{
+    try {
+        return std::filesystem::weakly_canonical(p).string();
+    } catch(...) {
+        return p.lexically_normal().string();
+    }
+}
+
+// Iterates over a given directory and adds it to a list. This is to
+// reduce calls to hit the os filesystem reads
+void build_assets(const std::filesystem::path &root)
+{
+    if (content_browser.files.size() > 0)
+    {
+        content_browser.files.clear();
+    }
+
+    for (auto& directory_entry : std::filesystem::directory_iterator(root))
+    {
+        // const auto& path = directory_entry.path();
+        auto relative_path = std::filesystem::relative(directory_entry.path(), root);
+        // std::string filename_string = relative_path.filename().string();
+
+        ANode node;
+        node.path = directory_entry.path();
+        node.filename = relative_path.filename().string();
+
+        if (directory_entry.is_directory())
+        {
+            node.isDirectory = true;
+        }
+
+        if (directory_entry.path().extension() == ".png")
+        {
+            // std::cout << directory_entry.path().extension() << std::endl;
+            node.texture = new Texture2D();
+            LoadTexture(node.texture, directory_entry.path().string().c_str(), true);
+        }
+
+        content_browser.files.emplace_back(node);
+    }
+}
+
 // Default theme
 void SetupImGuiStyle()
 {
@@ -112,7 +157,24 @@ void init_editor(Window *window)
     ImGui_ImplOpenGL3_Init(editor.glsl_version);
     editor.firstTime = true;
     editor.window = window;
+    
     SetupImGuiStyle();
+    
+    // Content browser
+    content_browser.asset_path = "assets";
+    content_browser.current_directory = content_browser.asset_path;
+    content_browser.current_filename = "assets";
+    content_browser.padding = 16;
+    content_browser.thumbnail_size = 90;
+
+    content_browser.folder_icon = new Texture2D();
+    content_browser.file_icon = new Texture2D();
+    LoadTexture(content_browser.folder_icon, "assets/editor/folder.png", true);
+    LoadTexture(content_browser.file_icon, "assets/editor/file.png", true);
+
+    build_assets("assets");
+    editor.sprite_temp = new Texture2D();
+
 }
 
 bool open = true;
@@ -143,9 +205,9 @@ void show_editor(render_context *context, int fps, game_memory *GM)
     int node_clicked = -1;
     
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen;
-    ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-    ImGuiTreeNodeFlags flag_selected = ImGuiTreeNodeFlags_Selected | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-    ImGuiTreeNodeFlags flag_unselected = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;
+    ImGuiTreeNodeFlags flag_selected = ImGuiTreeNodeFlags_Selected | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;
+    ImGuiTreeNodeFlags flag_unselected = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;;
 
     for (int i = 0; i < state->entities.size(); i++)
     {
@@ -153,14 +215,17 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         if (isSelected)
         {
             node_flags = flag_selected;
+            editor.sprite_temp = state->entities[i].sprite.texture;
         }
         else
         {
             node_flags = flag_unselected;
         }
 
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 10.0f));
         bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)&state->entities[i], node_flags, state->entities[i].name, i);
 
+        ImGui::PopStyleVar();
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
             state->selected_entity = i;
@@ -170,6 +235,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         {
             ImGui::TreePop();
         }
+        
         
     }
     
@@ -221,14 +287,6 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
-            // ImGui::Text("Scale");
-            // ImGui::PushItemWidth(w_width);
-            // ImGui::DragFloat("##Entity Scale X", &state->entities[state->selected_entity].transform.scale.x, 0.01f, 0.0f, 0.0f, "X: %.02f");
-            // ImGui::PopItemWidth();
-            // ImGui::SameLine();
-            // ImGui::PushItemWidth(w_width - 8.0f);
-            // ImGui::DragFloat("##Entity Scale Y", &state->entities[state->selected_entity].transform.scale.y, 0.01f, 0.0f, 0.0f, "Y: %.02f");
-            // ImGui::PopItemWidth();
 
             ImGui::Text("Size");
             ImGui::PushItemWidth(w_width);
@@ -275,10 +333,10 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                 }
                 saved_palette_init = false;
             }
+
     
 
             ImGui::Text("Sprite Color");
-            ImGui::SameLine();
             bool open_popup = ImGui::ColorButton("MyColor##3b", color, base_flags);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             open_popup |= ImGui::Button("Palette");
@@ -344,6 +402,28 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                 ImGui::EndGroup();
                 ImGui::EndPopup();
             }
+            
+           
+            ImGui::Text("Texture");
+            ImGui::Image(editor.sprite_temp->ID, ImVec2(100, 100));
+            if (ImGui::IsItemHovered())
+            {
+                // ImGui::SetTooltip(state->entities[state->selected_entity].sprite.texture->path);
+            }
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+                {
+                    const char *payload_data = static_cast<const char*>(payload->Data);
+                    std::string path = payload_data;
+                    printf("path? : %s\n", path.c_str());
+                    LoadTexture(editor.sprite_temp, path.c_str());
+                    state->entities[state->selected_entity].sprite.texture = editor.sprite_temp;
+                }
+
+                ImGui::EndDragDropTarget();
+            }
+
         }
     }
 
@@ -514,8 +594,114 @@ void show_editor(render_context *context, int fps, game_memory *GM)
 
     ImGui::End();
 
-    ImGui::Begin("Project");
-    ImGui::Text("Project");
+
+    ImGui::Begin("Content Browser");
+    ImGui::BeginChild("##cb_topbar", ImVec2(0, 34), false);
+    bool disabled = content_browser.current_directory != std::filesystem::path(content_browser.asset_path);
+    if (!disabled)
+    {
+        ImGui::BeginDisabled(true);
+    }
+
+    if (ImGui::Button("<-"))
+    {
+        content_browser.current_directory = content_browser.current_directory.parent_path();
+        content_browser.current_filename = "assets";
+        build_assets(content_browser.current_directory);
+    }
+    if (!disabled)
+    {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+
+    ImGui::TextUnformatted(canonical_to_string(content_browser.current_filename).c_str());
+    ImGui::EndChild();
+
+    ImVec2 parentContentSize = ImGui::GetContentRegionAvail();
+    float childHeight = parentContentSize.y * 0.8f;
+    ImGui::BeginChild("##cb_content", ImVec2(0, childHeight), false);
+
+    float cell_size = content_browser.thumbnail_size + content_browser.padding;
+    float panel_width = ImGui::GetContentRegionAvail().x;
+    int column_count = (int)(panel_width / cell_size);
+
+    if (column_count < 1)
+    {
+        column_count = 1;
+    }
+    
+    ImGui::Columns(column_count, 0, false);
+
+    for (int i = 0; i < content_browser.files.size(); i++)
+    {
+        Texture2D *icon = content_browser.files[i].isDirectory ? content_browser.folder_icon : content_browser.file_icon;
+        if (content_browser.files[i].texture != nullptr)
+        {
+            icon = content_browser.files[i].texture;
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::ImageButton(content_browser.files[i].path.string().c_str(), icon->ID, ImVec2(content_browser.thumbnail_size, content_browser.thumbnail_size),
+                            ImVec2(0, 1), ImVec2(1,0));
+
+
+        if (ImGui::BeginDragDropSource())
+        {
+            // const wchar_t *item_path = relative_path.c_str();
+            std::string rel = content_browser.files[i].path.string();
+            ImGui::SetDragDropPayload("CONTENT_BROWSER_ITEM", rel.c_str(), (rel.size() + 1) * sizeof(char), ImGuiCond_Once);
+
+            ImVec2 mousePos = ImGui::GetIO().MousePos;
+            ImVec2 imageSize = ImVec2(50, 50);
+            ImVec2 tooltipPos = ImVec2(mousePos.x - imageSize.x * 0.8f, mousePos.y - imageSize.y * 0.8f);
+            
+            ImGui::SetNextWindowPos(tooltipPos);
+            if (ImGui::BeginTooltip())
+            {
+                ImGui::Image(icon->ID, imageSize);
+                ImGui::EndTooltip();
+            }
+            
+            ImGui::EndDragDropSource();
+        }
+
+        ImGui::PopStyleColor();
+
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        {
+            if (content_browser.files[i].isDirectory)
+            {
+                content_browser.current_directory /= content_browser.files[i].path.filename();
+                content_browser.current_filename = content_browser.files[i].path.filename();
+                build_assets(content_browser.current_directory);
+            }
+        }
+
+        
+        ImGui::TextWrapped(content_browser.files[i].filename.c_str());
+        ImGui::NextColumn();
+    }
+
+    ImGui::Columns(1);
+    ImGui::EndChild();
+
+    ImGui::SetCursorPosY(parentContentSize.y + 40);
+    ImGui::BeginChild("##cb_statusbar", ImVec2(0, 34), false);
+
+    ImGui::Text("Thumbnail Size");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(200);
+    ImGui::SliderInt("##Thumbnail Size", &content_browser.thumbnail_size, 64, 512);
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::Text("Padding");
+    ImGui::PushItemWidth(200);
+    ImGui::SameLine();
+    ImGui::SliderInt("##Padding", &content_browser.padding, 0, 32);
+    ImGui::PopItemWidth();
+    ImGui::EndChild();
     ImGui::End();
 
     if (editor.firstTime)
@@ -528,9 +714,11 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         ImGuiID right_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.25f, nullptr, &dockspace_id);
         ImGuiID left_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.20f, nullptr, &dockspace_id);
         ImGuiID bottom_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.35f, nullptr, &dockspace_id);
-        ImGui::DockBuilderDockWindow("Scene Hierarchy", left_node_id);
+        ImGuiID scene_dock_id = ImGui::GetWindowDockID();
+        ImGuiID scene_dock_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.25f, nullptr, &scene_dock_left);
+        ImGui::DockBuilderDockWindow("Scene Hierarchy", scene_dock_left);
         ImGui::DockBuilderDockWindow("Inspector", right_node_id);
-        ImGui::DockBuilderDockWindow("Project", bottom_node_id);
+        ImGui::DockBuilderDockWindow("Content Browser", bottom_node_id);
         ImGui::DockBuilderDockWindow("Scene", dockspace_id);
         ImGui::DockBuilderFinish(dockspace_id);
     }

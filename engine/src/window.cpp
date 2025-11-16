@@ -33,8 +33,6 @@ bool create_window(Window *window, const char *title, int width, int height)
 
     GLFWmonitor* primary = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(primary);
-    window->width = mode->width;
-    window->height = mode->height;
     glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
     window->window = glfwCreateWindow(window->width, window->height, window->title, nullptr, nullptr);

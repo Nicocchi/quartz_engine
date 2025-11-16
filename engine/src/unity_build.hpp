@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <map>
 #include <queue>
+#include <filesystem>
 
 #include "raymath_ext.h"
 
