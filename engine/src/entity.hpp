@@ -12,6 +12,7 @@ struct Sprite
 {
     Texture2D *texture;
     Vector4 color;
+    int z_index = 0;
 };
 
 struct AnimatedSprite

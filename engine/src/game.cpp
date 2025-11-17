@@ -3,7 +3,7 @@
 // unitybuild
 #include <cstdio>
 
-// Layer - z-index
+// Layer - z-index [X]
 // don't change original order
 // secondary list of pointers to each entity and sort that based on z-index (per frame - discard after)
 // generate render commands
@@ -42,6 +42,11 @@
 
 void game_init(game_memory *GameMemory);
 
+bool compareEntities(const Entity *a, const Entity *b)
+{
+    return a->sprite.z_index < b->sprite.z_index;
+}
+
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     game_state *state = (game_state*)GameMemory->storage;
@@ -54,87 +59,94 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         GameMemory->isInit = true;
     }
 
+    std::vector<Entity*> entities;
+    for (int i = 0; i < state->entities.size(); i++)
+    {
+        entities.push_back(&state->entities[i]);
+    }
+    std::sort(entities.begin(), entities.end(), compareEntities);
+
     for (int i = 0; i < state->entities.size(); i++)
     {
         render_command draw_texture;
         draw_texture.type = DRAW_TEXTURE;
-        draw_texture.id = state->entities[i].id;
-        draw_texture.texture = state->entities[i].sprite.texture;
+        draw_texture.id = entities[i]->id;
+        draw_texture.texture = entities[i]->sprite.texture;
 
-        Vector2 pos = state->entities[i].transform.position;
-        Vector2 esize = state->entities[i].transform.size;
-        float rotation = state->entities[i].transform.rotation;
+        Vector2 pos = entities[i]->transform.position;
+        Vector2 esize = entities[i]->transform.size;
+        float rotation = entities[i]->transform.rotation;
 
         vertex *v = &render_state->vertices[render_state->vertexCount];
 
         // Sprite animation
-        float tw = float(state->entities[i].animated_sprite.cell_width) / state->entities[i].animated_sprite.texture_width;
-        float th = float(state->entities[i].animated_sprite.cell_height) / state->entities[i].animated_sprite.texture_height;
-        int width = state->entities[i].animated_sprite.cell_width;
-        int twidth = state->entities[i].animated_sprite.texture_width;
+        float tw = float(entities[i]->animated_sprite.cell_width) / entities[i]->animated_sprite.texture_width;
+        float th = float(entities[i]->animated_sprite.cell_height) / entities[i]->animated_sprite.texture_height;
+        int width = entities[i]->animated_sprite.cell_width;
+        int twidth = entities[i]->animated_sprite.texture_width;
         int numPerRow = twidth / width;
 
-        state->entities[i].animated_sprite.current_duration += deltaTime;
+        entities[i]->animated_sprite.current_duration += deltaTime;
 
 
 
-        if (state->entities[i].animated_sprite.current_duration >= state->entities[i].animated_sprite.frame_duration)
+        if (entities[i]->animated_sprite.current_duration >= entities[i]->animated_sprite.frame_duration)
         {
-            state->entities[i].animated_sprite.current_duration = 0.0f;
-            state->entities[i].animated_sprite.frame_index++;
+            entities[i]->animated_sprite.current_duration = 0.0f;
+            entities[i]->animated_sprite.frame_index++;
 
-            if (state->entities[i].animated_sprite.frame_index > state->entities[i].animated_sprite.end_frame)
+            if (entities[i]->animated_sprite.frame_index > entities[i]->animated_sprite.end_frame)
             {
-                state->entities[i].animated_sprite.frame_index = state->entities[i].animated_sprite.start_frame;
+                entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
             }
         }
         
-        int frame = state->entities[i].animated_sprite.frame_index;
+        int frame = entities[i]->animated_sprite.frame_index;
         
         float tx = (frame % numPerRow) * tw;
         float ty = 1.0f - ((frame / numPerRow) + 1) * th;
 
-        tx += state->entities[i].animated_sprite.offset_x;
-        ty += state->entities[i].animated_sprite.offset_y;
+        tx += entities[i]->animated_sprite.offset_x;
+        ty += entities[i]->animated_sprite.offset_y;
 
         v[0].position = pos;
         // Top-left
         v[0].texCoords.x = tx;
         v[0].texCoords.y = ty + th;
-        v[0].color.x = state->entities[i].sprite.color.x;
-        v[0].color.y = state->entities[i].sprite.color.y;
-        v[0].color.z = state->entities[i].sprite.color.z;
-        v[0].color.w = state->entities[i].sprite.color.w;
+        v[0].color.x = entities[i]->sprite.color.x;
+        v[0].color.y = entities[i]->sprite.color.y;
+        v[0].color.z = entities[i]->sprite.color.z;
+        v[0].color.w = entities[i]->sprite.color.w;
 
         v[1].position.x = pos.x + esize.x;
         v[1].position.y = pos.y;
         // Top-right
         v[1].texCoords.x = tx + tw;
         v[1].texCoords.y = ty + th;
-        v[1].color.x = state->entities[i].sprite.color.x;
-        v[1].color.y = state->entities[i].sprite.color.y;
-        v[1].color.z = state->entities[i].sprite.color.z;
-        v[1].color.w = state->entities[i].sprite.color.w;
+        v[1].color.x = entities[i]->sprite.color.x;
+        v[1].color.y = entities[i]->sprite.color.y;
+        v[1].color.z = entities[i]->sprite.color.z;
+        v[1].color.w = entities[i]->sprite.color.w;
 
         v[2].position.x = pos.x + esize.x;
         v[2].position.y = pos.y + esize.y;
         // Bottom-right
         v[2].texCoords.x = tx + tw;
         v[2].texCoords.y = ty;
-        v[2].color.x = state->entities[i].sprite.color.x;
-        v[2].color.y = state->entities[i].sprite.color.y;
-        v[2].color.z = state->entities[i].sprite.color.z;
-        v[2].color.w = state->entities[i].sprite.color.w;
+        v[2].color.x = entities[i]->sprite.color.x;
+        v[2].color.y = entities[i]->sprite.color.y;
+        v[2].color.z = entities[i]->sprite.color.z;
+        v[2].color.w = entities[i]->sprite.color.w;
 
         v[3].position.x = pos.x;
         v[3].position.y = pos.y + esize.y;
         // Bottom-left
         v[3].texCoords.x = tx;
         v[3].texCoords.y = ty;
-        v[3].color.x = state->entities[i].sprite.color.x;
-        v[3].color.y = state->entities[i].sprite.color.y;
-        v[3].color.z = state->entities[i].sprite.color.z;
-        v[3].color.w = state->entities[i].sprite.color.w;
+        v[3].color.x = entities[i]->sprite.color.x;
+        v[3].color.y = entities[i]->sprite.color.y;
+        v[3].color.z = entities[i]->sprite.color.z;
+        v[3].color.w = entities[i]->sprite.color.w;
 
 
         if (rotation != 0)
@@ -178,6 +190,8 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         draw_texture.count = 6;
 
         render_state->render_commands.push(draw_texture);
+
+        entities.clear();
     }
 }
 
@@ -251,9 +265,6 @@ void game_init(game_memory *GameMemory)
     entity.animated_sprite.frame_duration = 0.25f;
     
     entity.transform.rotation = 0.0f;
-    // entity.texture = new Texture2D();
-    // entity.texture->isLoadedGPU = false;
-    // entity.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
     render_command load_texture;
     load_texture.type = UPLOAD;
@@ -264,4 +275,31 @@ void game_init(game_memory *GameMemory)
     state->entities.push_back(entity);
 
     state->selected_entity = 0;
+
+    Entity entity2;
+    entity2.id = state->nextID++;
+    entity2.name = "Quad";
+    entity2.transform.position.x = -191;
+    entity2.transform.position.y = -191;
+    entity2.transform.size.x = 240.0f;
+    entity2.transform.size.y = 240.0f;
+
+    entity2.sprite.texture = new Texture2D();
+    entity2.sprite.texture->isLoadedGPU = false;
+    entity2.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    entity2.animated_sprite.frame_index = 12;
+    entity2.animated_sprite.texture_width = 96;
+    entity2.animated_sprite.texture_height = 96;
+    entity2.animated_sprite.offset_x = 0.0f;
+    entity2.animated_sprite.offset_y = 0.0f;
+    entity2.animated_sprite.cell_width = 24;
+    entity2.animated_sprite.cell_height = 24;
+    entity2.animated_sprite.max_frames = 16;
+    entity2.animated_sprite.start_frame = 12;
+    entity2.animated_sprite.end_frame = 15;
+    entity2.animated_sprite.frame_duration = 0.25f;
+    
+    entity2.transform.rotation = 0.0f;
+    state->entities.push_back(entity2);
 }

@@ -223,8 +223,17 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         }
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 10.0f));
+        if (isSelected)
+        {
+            ImU32 col = ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderHovered]);
+            ImGui::PushStyleColor(ImGuiCol_Header, col);
+        }
         bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)&state->entities[i], node_flags, state->entities[i].name, i);
 
+        if (isSelected)
+        {
+            ImGui::PopStyleColor();
+        }
         ImGui::PopStyleVar();
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
@@ -242,12 +251,12 @@ void show_editor(render_context *context, int fps, game_memory *GM)
     ImGui::End();
 
     ImGui::Begin("Inspector");
+    ImVec2 available_size = ImGui::GetContentRegionAvail();
+    float w_width = available_size.x / 2.5;
     if (state->entities.size() > 0)
     {
         ImGui::Text(state->entities[state->selected_entity].name);
 
-        ImVec2 available_size = ImGui::GetContentRegionAvail();
-        float w_width = available_size.x / 2.5;
         ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Spacing();
@@ -424,6 +433,18 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                 ImGui::EndDragDropTarget();
             }
 
+            ImGui::Text("Z-Index");
+            ImGui::PushItemWidth(w_width);
+            ImGui::DragInt("##Entity z-index", &state->entities[state->selected_entity].sprite.z_index);
+            // ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushID("ResetSpriteZIndex");
+            if (ImGui::Button("Reset"))
+            {
+                
+            }
+            ImGui::PopItemWidth();
+            ImGui::PopID();
         }
     }
 
