@@ -445,6 +445,9 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
+
+            ImGui::Checkbox("Flip Horizontal", &state->entities[state->selected_entity].sprite.flip_x);
+            ImGui::Checkbox("Flip Vertical", &state->entities[state->selected_entity].sprite.flip_y);
         }
     }
 

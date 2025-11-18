@@ -13,6 +13,8 @@ struct Sprite
     Texture2D *texture;
     Vector4 color;
     int z_index = 0;
+    bool flip_x;
+    bool flip_y;
 };
 
 struct AnimatedSprite

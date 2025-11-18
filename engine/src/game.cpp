@@ -4,21 +4,21 @@
 #include <cstdio>
 
 // Layer - z-index [X]
-// don't change original order
-// secondary list of pointers to each entity and sort that based on z-index (per frame - discard after)
-// generate render commands
+//  don't change original order
+//  secondary list of pointers to each entity and sort that based on z-index (per frame - discard after)
+//  generate render commands
 
 // blending
-// full blend mode - normal - additive - multiply - screen
-// opacity - transparency [X]
+//  full blend mode - normal - additive - multiply - screen
+//  opacity - transparency [X]
 
 // texture subregions - texture atlas [X]
 
-// flip texture (horz - vert)
+// flip texture (horz - vert) [x]
 
 // gradients
 
-// per-vertex coloring
+// per-vertex coloring [x]
 // per-vertex upload colors (only corners) - inbetween gets interpolated
 
 // shapes
@@ -47,6 +47,7 @@ bool compareEntities(const Entity *a, const Entity *b)
     return a->sprite.z_index < b->sprite.z_index;
 }
 
+std::vector<Entity*> entities;
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     game_state *state = (game_state*)GameMemory->storage;
@@ -59,7 +60,6 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         GameMemory->isInit = true;
     }
 
-    std::vector<Entity*> entities;
     for (int i = 0; i < state->entities.size(); i++)
     {
         entities.push_back(&state->entities[i]);
@@ -109,40 +109,48 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         tx += entities[i]->animated_sprite.offset_x;
         ty += entities[i]->animated_sprite.offset_y;
 
+        float u0 = tx;
+        float u1 = tx + tw;
+        float v0 = ty;
+        float v1 = ty + th;
+
+        if (entities[i]->sprite.flip_x)
+        {
+            std::swap(u0, u1);
+        }
+
+        if (entities[i]->sprite.flip_y)
+        {
+            std::swap(v0, v1);
+        }
+
         v[0].position = pos;
         // Top-left
-        v[0].texCoords.x = tx;
-        v[0].texCoords.y = ty + th;
+        v[0].texCoords = {u0, v1};
         v[0].color.x = entities[i]->sprite.color.x;
         v[0].color.y = entities[i]->sprite.color.y;
         v[0].color.z = entities[i]->sprite.color.z;
         v[0].color.w = entities[i]->sprite.color.w;
 
-        v[1].position.x = pos.x + esize.x;
-        v[1].position.y = pos.y;
+        v[1].position = {pos.x + esize.x, pos.y};
         // Top-right
-        v[1].texCoords.x = tx + tw;
-        v[1].texCoords.y = ty + th;
+        v[1].texCoords = {u1, v1};
         v[1].color.x = entities[i]->sprite.color.x;
         v[1].color.y = entities[i]->sprite.color.y;
         v[1].color.z = entities[i]->sprite.color.z;
         v[1].color.w = entities[i]->sprite.color.w;
 
-        v[2].position.x = pos.x + esize.x;
-        v[2].position.y = pos.y + esize.y;
+        v[2].position = {pos.x + esize.x, pos.y + esize.y};
         // Bottom-right
-        v[2].texCoords.x = tx + tw;
-        v[2].texCoords.y = ty;
+        v[2].texCoords = {u1, v0};
         v[2].color.x = entities[i]->sprite.color.x;
         v[2].color.y = entities[i]->sprite.color.y;
         v[2].color.z = entities[i]->sprite.color.z;
         v[2].color.w = entities[i]->sprite.color.w;
 
-        v[3].position.x = pos.x;
-        v[3].position.y = pos.y + esize.y;
+        v[3].position = {pos.x, pos.y + esize.y};
         // Bottom-left
-        v[3].texCoords.x = tx;
-        v[3].texCoords.y = ty;
+        v[3].texCoords = {u0, v0};
         v[3].color.x = entities[i]->sprite.color.x;
         v[3].color.y = entities[i]->sprite.color.y;
         v[3].color.z = entities[i]->sprite.color.z;
@@ -251,6 +259,7 @@ void game_init(game_memory *GameMemory)
     entity.sprite.texture = new Texture2D();
     entity.sprite.texture->isLoadedGPU = false;
     entity.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    entity.sprite.z_index = 1;
 
     entity.animated_sprite.frame_index = 12;
     entity.animated_sprite.texture_width = 96;
@@ -287,6 +296,7 @@ void game_init(game_memory *GameMemory)
     entity2.sprite.texture = new Texture2D();
     entity2.sprite.texture->isLoadedGPU = false;
     entity2.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    entity2.sprite.z_index = 0;
 
     entity2.animated_sprite.frame_index = 12;
     entity2.animated_sprite.texture_width = 96;
