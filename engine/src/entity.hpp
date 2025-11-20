@@ -29,18 +29,15 @@ struct AnimatedSprite
     float current_duration;
     float offset_x;
     float offset_y;
+    bool changed = false;
 };
 
 struct Entity
 {
     unsigned int id;
-    //Texture2D *texture;
     Transform transform;
     Sprite sprite;
     AnimatedSprite animated_sprite;
     const char *name;
     size_t vertexOffset = 0; // index into the shared vertex buffer
-    // glm::vec2 velocity;
-
-    // Vector4 color;
 };

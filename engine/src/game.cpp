@@ -28,7 +28,7 @@
 // batch rend
 
 
-// input
+// input [x]
 // sound
 // font
 // physics - collisions - box2d
@@ -37,6 +37,7 @@
 // in-game ui
 // profiling - perf/tracy (casey)
 // threading
+// hot reloading [x]
 
 // tilemaps
 
@@ -67,17 +68,85 @@ bool isKeyPressed(unsigned int keycode, input_state *Input)
     return Input->keys[keycode];
 }
 
-void process_input(input_state *Input)
-{
+unsigned int previous_keycode;
 
+void process_input(game_state *state, input_state *Input, float dt)
+{
+    float velocity = 300 * dt;
     if (isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT, Input))
     {
-        // printf("Mouse button left clicked\n");
     }
 
     if (isKeyPressed(GLFW_KEY_A, Input))
     {
-        // printf("A pressed\n");
+
+        state->entities[0].transform.position.x -= velocity;
+        state->entities[0].animated_sprite.start_frame = 8;
+        state->entities[0].animated_sprite.end_frame = 11;
+        if (previous_keycode != GLFW_KEY_A && !state->entities[0].animated_sprite.changed)
+        {
+            previous_keycode = GLFW_KEY_A;
+            state->entities[0].animated_sprite.changed = true;
+        }
+        if (state->entities[0].animated_sprite.changed)
+        {
+            state->entities[0].animated_sprite.frame_index = 8;
+            state->entities[0].animated_sprite.changed = false;
+        }
+    }
+
+    if (isKeyPressed(GLFW_KEY_D, Input))
+    {
+        state->entities[0].transform.position.x += velocity;
+        state->entities[0].animated_sprite.start_frame = 4;
+        state->entities[0].animated_sprite.end_frame = 7;
+
+        if (previous_keycode != GLFW_KEY_D && !state->entities[0].animated_sprite.changed)
+        {
+            previous_keycode = GLFW_KEY_D;
+            state->entities[0].animated_sprite.changed = true;
+        }
+        if (state->entities[0].animated_sprite.changed)
+        {
+            state->entities[0].animated_sprite.frame_index = 4;
+            state->entities[0].animated_sprite.changed = false;
+        }
+    }
+
+    if (isKeyPressed(GLFW_KEY_W, Input))
+    {
+        state->entities[0].transform.position.y += velocity;
+        state->entities[0].animated_sprite.start_frame = 0;
+        state->entities[0].animated_sprite.end_frame = 3;
+
+        if (previous_keycode != GLFW_KEY_W && !state->entities[0].animated_sprite.changed)
+        {
+            previous_keycode = GLFW_KEY_W;
+            state->entities[0].animated_sprite.changed = true;
+        }
+        if (state->entities[0].animated_sprite.changed)
+        {
+            state->entities[0].animated_sprite.frame_index = 0;
+            state->entities[0].animated_sprite.changed = false;
+        }
+    }
+
+    if (isKeyPressed(GLFW_KEY_S, Input))
+    {
+        state->entities[0].transform.position.y -= velocity;
+        state->entities[0].animated_sprite.start_frame = 12;
+        state->entities[0].animated_sprite.end_frame = 14;
+
+        if (previous_keycode != GLFW_KEY_S && !state->entities[0].animated_sprite.changed)
+        {
+            previous_keycode = GLFW_KEY_S;
+            state->entities[0].animated_sprite.changed = true;
+        }
+        if (state->entities[0].animated_sprite.changed)
+        {
+            state->entities[0].animated_sprite.frame_index = 12;
+            state->entities[0].animated_sprite.changed = false;
+        }
     }
 }
 
@@ -94,7 +163,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         GameMemory->isInit = true;
     }
 
-    process_input(Input);
+    process_input(state, Input, deltaTime);
 
     for (int i = 0; i < state->entities.size(); i++)
     {
@@ -129,12 +198,33 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         if (entities[i]->animated_sprite.current_duration >= entities[i]->animated_sprite.frame_duration)
         {
             entities[i]->animated_sprite.current_duration = 0.0f;
+
+
             entities[i]->animated_sprite.frame_index++;
+
+
+            // if (entities[i]->animated_sprite.frame_index >= entities[i]->animated_sprite.start_frame
+            //     && entities[i]->animated_sprite.frame_index <= entities[i]->animated_sprite.end_frame)
+            // {
+            //     if (entities[i]->animated_sprite.changed)
+            //     {
+            //         entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
+            //     }
+            //     else
+            //     {
+            //         entities[i]->animated_sprite.frame_index++;
+            //     }
+            // }
+            // else
+            // {
+            //     entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
+            // }
 
             if (entities[i]->animated_sprite.frame_index > entities[i]->animated_sprite.end_frame)
             {
                 entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
             }
+            // state->entities[0].animated_sprite.changed = false;
         }
 
         int frame = entities[i]->animated_sprite.frame_index;
@@ -235,14 +325,19 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
         render_state->render_commands.push(draw_texture);
 
-        entities.clear();
     }
+    entities.clear();
 }
 
 void game_init(game_memory *GameMemory)
 {
+
     game_state *state = (game_state*)GameMemory->storage;
     render_context *render_state = (render_context*)GameMemory->renderStorage;
+
+    state->entities.clear();
+    state->entities_sorted.clear();
+    state->selected_entity = 0;
 
     render_state->color.r = 66.0f / 255;
     render_state->color.g = 135.0f / 255;
@@ -262,27 +357,6 @@ void game_init(game_memory *GameMemory)
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distr(-1000, 1000); // range
 
-    // for (int i = 0; i < 20; i++)
-    // {
-    //     Entity entity;
-    //     entity.id = state->nextID++;
-    //     entity.name = "Entity 1";
-    //     entity.transform.position.x = distr(gen);
-    //     entity.transform.position.y = distr(gen);
-    //     entity.transform.size.x = 200.0f;
-    //     entity.transform.size.y = 200.0f;
-    //     entity.transform.rotation = 0.0f;
-    //     entity.texture = new Texture2D();
-    //     entity.texture->isLoadedGPU = false;
-
-    //     render_command load_texture;
-    //     load_texture.type = UPLOAD;
-    //     load_texture.filePath = "assets/textures/block.png";
-    //     load_texture.texture = entity.texture;
-    //     render_state->render_commands.push(load_texture);
-
-    //     state->entities.push_back(entity);
-    // }
 
     Entity entity;
     entity.id = state->nextID++;
