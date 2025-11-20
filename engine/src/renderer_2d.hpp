@@ -44,11 +44,8 @@ struct render_command
 {
     RENDER_TYPE type;
     uint32_t id;
-    
-    char *filePath;
-    // glm::vec2 position;
-    // glm::vec2 scale;
-    // float rotation;
+
+    const char *filePath;
 
     unsigned int offset; // The position of the first vertices that is going to be drawn in the render state vertices
     unsigned int count; // Count of indices drawn

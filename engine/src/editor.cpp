@@ -55,7 +55,7 @@ void SetupImGuiStyle()
 {
 	// Future Dark style by rewrking from ImThemes
 	ImGuiStyle& style = ImGui::GetStyle();
-	
+
 	style.Alpha = 1.0f;
 	style.DisabledAlpha = 1.0f;
 	style.WindowPadding = ImVec2(12.0f, 12.0f);
@@ -86,7 +86,7 @@ void SetupImGuiStyle()
 	style.ColorButtonPosition = ImGuiDir_Right;
 	style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
 	style.SelectableTextAlign = ImVec2(0.0f, 0.0f);
-	
+
 	style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.27450982f, 0.31764707f, 0.4509804f, 1.0f);
 	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.078431375f, 0.08627451f, 0.101960786f, 1.0f);
@@ -157,9 +157,9 @@ void init_editor(Window *window)
     ImGui_ImplOpenGL3_Init(editor.glsl_version);
     editor.firstTime = true;
     editor.window = window;
-    
+
     SetupImGuiStyle();
-    
+
     // Content browser
     content_browser.asset_path = "assets";
     content_browser.current_directory = content_browser.asset_path;
@@ -187,13 +187,13 @@ Vector4 ImVec4ToVec4(const ImVec4& v) {
     return Vector4{v.x, v.y, v.z, v.w };
 }
 
-void show_editor(render_context *context, int fps, game_memory *GM)
+void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM)
 {
     game_state *state = (game_state*)GM->storage;
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    
+
     ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
@@ -203,7 +203,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
 
     static int selection_mask = (1 << 2);
     int node_clicked = -1;
-    
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen;
     ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;
     ImGuiTreeNodeFlags flag_selected = ImGuiTreeNodeFlags_Selected | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;
@@ -244,10 +244,10 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         {
             ImGui::TreePop();
         }
-        
-        
+
+
     }
-    
+
     ImGui::End();
 
     ImGui::Begin("Inspector");
@@ -266,12 +266,12 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity X", &state->entities[state->selected_entity].transform.position.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
-            
+
             ImGui::SameLine();
             ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity Y", &state->entities[state->selected_entity].transform.position.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
-            
+
             ImGui::SameLine();
             ImGui::PushItemWidth(w_width - 8.0f);
             ImGui::PushID("ResetEntityPos");
@@ -305,7 +305,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::PushItemWidth(w_width);
             ImGui::DragFloat("##Entity Size Y", &state->entities[state->selected_entity].transform.size.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
-            
+
             ImGui::SameLine();
             ImGui::PushItemWidth(w_width - 8.0f);
             ImGui::PushID("ResetEntitySize");
@@ -317,7 +317,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::PopID();
         }
 
-        
+
         ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Spacing();
@@ -343,14 +343,14 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                 saved_palette_init = false;
             }
 
-    
+
 
             ImGui::Text("Sprite Color");
             bool open_popup = ImGui::ColorButton("MyColor##3b", color, base_flags);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             open_popup |= ImGui::Button("Palette");
             bool popup_opened_last_frame = false;
-            
+
             if (open_popup && !popup_opened_last_frame)
             {
                 ImGui::OpenPopup("mypicker");
@@ -366,7 +366,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                     state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
                 }
                 ImGui::SameLine();
-    
+
                 ImGui::BeginGroup(); // Lock X position
                 ImGui::Text("Current");
                 ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(60, 40));
@@ -381,16 +381,16 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                     {
                         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
                     }
-    
+
                     ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
                     if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20)))
                     {
-                        
+
                         // entity_color = ImVec4ToVec4(ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w))
                         color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
                         state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
                     }
-    
+
                     // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
                     // drag source by default, unless specifying the ImGuiColorEditFlags_NoDragDrop flag.
                     if (ImGui::BeginDragDropTarget())
@@ -405,14 +405,14 @@ void show_editor(render_context *context, int fps, game_memory *GM)
                         }
                         ImGui::EndDragDropTarget();
                     }
-    
+
                     ImGui::PopID();
                 }
                 ImGui::EndGroup();
                 ImGui::EndPopup();
             }
-            
-           
+
+
             ImGui::Text("Texture");
             ImGui::Image(editor.sprite_temp->ID, ImVec2(100, 100));
             if (ImGui::IsItemHovered())
@@ -441,7 +441,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::PushID("ResetSpriteZIndex");
             if (ImGui::Button("Reset"))
             {
-                
+
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
@@ -484,7 +484,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
-            
+
             ImGui::Text("Frame Range");
             ImGui::PushItemWidth(available_size.x / 3.5f);
             ImGui::DragInt("##Entity Start Frame", &state->entities[state->selected_entity].animated_sprite.start_frame, 1, 0, state->entities[state->selected_entity].animated_sprite.max_frames);
@@ -512,7 +512,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
-            
+
             ImGui::Text("Cell Size");
             ImGui::PushItemWidth(available_size.x / 3.5f);
             ImGui::DragInt("##EntityCellSizeX", &state->entities[state->selected_entity].animated_sprite.cell_width, 1, 0, 0,"X: %d");
@@ -530,7 +530,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
             ImGui::PopItemWidth();
             ImGui::PopID();
-            
+
             ImGui::Text("Texture Size");
             ImGui::PushItemWidth(available_size.x / 3.5f);
             ImGui::DragInt("##EntityTextureSizeX", &state->entities[state->selected_entity].animated_sprite.texture_width, 1, 0, 0,"W: %d");
@@ -549,7 +549,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImGui::PopItemWidth();
             ImGui::PopID();
     }
-    
+
 
     ImGui::Spacing();
     ImGui::Spacing();
@@ -572,7 +572,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         ImGui::DragFloat("##Camera Rotation", &context->camera->rotation, 0.01f, -4.0f, 4.0f, "Rotation: %.02f");
         ImGui::PopItemWidth();
     }
-    
+
     ImGui::End();
 
     ImGui::Begin("Scene");
@@ -608,13 +608,18 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImVec2(0, 1),
             ImVec2(1, 0)
         );
-        
+
     ImVec2 imageMin = ImGui::GetItemRectMin();
     ImVec2 textPos = ImVec2(imageMin.x + 20, imageMin.y + 20);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     char buffer[64];
     snprintf(buffer, IM_ARRAYSIZE(buffer), "FPS: %d", fps);
     draw_list->AddText(textPos, IM_COL32(255, 255, 0, 255), buffer);
+
+    char mouse_buffer[255];
+    snprintf(mouse_buffer, IM_ARRAYSIZE(mouse_buffer), "%lf, %lf", Input->mx, Input->my);
+    ImVec2 mtextPos = ImVec2(imageMin.x + 20, imageMin.y + 40);
+    draw_list->AddText(mtextPos, IM_COL32(255, 255, 0, 255), mouse_buffer);
 
     ImGui::End();
 
@@ -655,7 +660,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
     {
         column_count = 1;
     }
-    
+
     ImGui::Columns(column_count, 0, false);
 
     for (int i = 0; i < content_browser.files.size(); i++)
@@ -680,14 +685,14 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             ImVec2 mousePos = ImGui::GetIO().MousePos;
             ImVec2 imageSize = ImVec2(50, 50);
             ImVec2 tooltipPos = ImVec2(mousePos.x - imageSize.x * 0.8f, mousePos.y - imageSize.y * 0.8f);
-            
+
             ImGui::SetNextWindowPos(tooltipPos);
             if (ImGui::BeginTooltip())
             {
                 ImGui::Image(icon->ID, imageSize);
                 ImGui::EndTooltip();
             }
-            
+
             ImGui::EndDragDropSource();
         }
 
@@ -703,7 +708,7 @@ void show_editor(render_context *context, int fps, game_memory *GM)
             }
         }
 
-        
+
         ImGui::TextWrapped(content_browser.files[i].filename.c_str());
         ImGui::NextColumn();
     }
@@ -746,13 +751,13 @@ void show_editor(render_context *context, int fps, game_memory *GM)
         ImGui::DockBuilderDockWindow("Scene", dockspace_id);
         ImGui::DockBuilderFinish(dockspace_id);
     }
-    
+
     ImGui::Render();
     glfwGetFramebufferSize(editor.window->window, &editor.window->width, &editor.window->height);
     glViewport(0, 0, editor.window->width, editor.window->height);
     glClearColor(editor.color.x * editor.color.w, editor.color.y * editor.color.w, editor.color.z * editor.color.w, editor.color.w);
     glClear(GL_COLOR_BUFFER_BIT);
-    
+
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 

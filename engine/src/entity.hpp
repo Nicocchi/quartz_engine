@@ -13,8 +13,8 @@ struct Sprite
     Texture2D *texture;
     Vector4 color;
     int z_index = 0;
-    bool flip_x;
-    bool flip_y;
+    bool flip_x = false;
+    bool flip_y = false;
 };
 
 struct AnimatedSprite
@@ -38,9 +38,9 @@ struct Entity
     Transform transform;
     Sprite sprite;
     AnimatedSprite animated_sprite;
-    char *name;
+    const char *name;
     size_t vertexOffset = 0; // index into the shared vertex buffer
     // glm::vec2 velocity;
-    
+
     // Vector4 color;
 };

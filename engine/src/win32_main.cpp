@@ -7,7 +7,7 @@
 #include "unity_build.hpp"
 
 
-void* loadDLL(char* dll)
+void* loadDLL(const char* dll)
 {
     HMODULE result = LoadLibraryA(dll);
     // QZ_ASSERT(result, "Failed to load dll: %s", dll);
@@ -15,7 +15,7 @@ void* loadDLL(char* dll)
     return result;
 }
 
-void* loadDLLFunc(void* dll, char* funName)
+void* loadDLLFunc(void* dll, const char* funName)
 {
     FARPROC proc = GetProcAddress((HMODULE)dll, funName);
     // QZ_ASSERT(proc, "Failed to load function: %s from DLL", funName);
@@ -33,6 +33,7 @@ bool freeDLL(void* dll)
 
 int main()
 {
+
     Window *window = new Window();
     if (!create_window(window, "Quartz", 1280, 720))
     {
@@ -67,20 +68,10 @@ int main()
     init_renderer(render_state, window->vwidth, window->vheight);
 
     render_camera camera;
-    camera.position.x = 0.0f;
-    camera.position.y = 0.0f;
-    // camera.position = glm::vec2(0.0f, 0.0f);
+    camera.position = { 0.0f, 0.0f };
     camera.zoom = 1.0f;
     camera.rotation = 0.0f;
     render_state->camera = &camera;
-
-    // Matrix projection = MatrixOrtho(0.0f, 1280, 720,
-    //                                 0.0f, -1.0f, 1.0f);
-
-    // glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(window->vwidth), static_cast<float>(window->vheight),
-    //                                     0.0f, -1.0f, 1.0f);
-
-    // render_state->projection = projection;
 
     while(!window_closed(window))
     {
@@ -90,7 +81,6 @@ int main()
         {
             // display frame count
             fps = frameCount;
-            // printf("%d fps\n", frameCount);
             frameCount = 0;
             previousTime = currentFrame;
         }
@@ -100,20 +90,19 @@ int main()
         // poll -> update -> render
         window_poll();
         render_state->projection = create_projection(camera.zoom, camera.position, camera.rotation, 1280, 720);
-        // render_state->width = window->vwidth;
-        // render_state->height = window->vheight;
 
         render_state->vertexCount = 0;
         render_state->indexCount = 0;
 
-        gameUpdate(&GameMemory, deltaTime);
+        // printf("ENGINE MX: %lf (%p)\n", window->Input->mx, window->Input);
+        gameUpdate(&GameMemory, window->Input, deltaTime);
 
         // render logic
         bind_framebuffer(render_state->fbo, window->vwidth, window->vheight);
         window_clear(render_state->color);
         draw_scene(render_state);
         unbind_framebuffer();
-        show_editor(render_state, fps, &GameMemory);
+        show_editor(render_state, fps, window->Input, &GameMemory);
 
         window_swap_buffers(window);
     }

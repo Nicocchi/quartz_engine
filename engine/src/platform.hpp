@@ -22,9 +22,18 @@ typedef struct game_memory
     bool isInit;
 } game_memory;
 
-#define GAME_UPDATE_AND_RENDER(name) void name(game_memory *GameMemory, float deltaTime)
-typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
+#define MAX_KEYS    1024
+#define MAX_BUTTONS 32
+typedef struct input_state
+{
+    bool keys[MAX_KEYS];
+    unsigned int keys_processed[MAX_KEYS];
+    bool mouse_buttons[MAX_BUTTONS];
+    double mx, my;
+} input_state;
 
+#define GAME_UPDATE_AND_RENDER(name) void name(game_memory *GameMemory, input_state *Input, float deltaTime)
+typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 
 #ifdef __cplusplus
 }

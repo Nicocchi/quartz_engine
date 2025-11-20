@@ -1,5 +1,6 @@
 #pragma once
 
+
 struct Window
 {
     const char *title;
@@ -7,7 +8,7 @@ struct Window
     int vwidth, vheight;
     GLFWwindow *window;
     bool closed;
-    // FrameBuffer *fbo;
+    input_state *Input;
 };
 
 bool create_window(Window *window, const char *title, int width, int height);

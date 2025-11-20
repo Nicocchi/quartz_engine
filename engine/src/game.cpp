@@ -47,6 +47,40 @@ bool compareEntities(const Entity *a, const Entity *b)
     return a->sprite.z_index < b->sprite.z_index;
 }
 
+bool isMouseButtonPressed(unsigned int button, input_state *Input)
+{
+    if (button >= 32)
+    {
+        return false;
+    }
+
+    return Input->mouse_buttons[button];
+}
+
+bool isKeyPressed(unsigned int keycode, input_state *Input)
+{
+    if (keycode >= 1024)
+    {
+        return false;
+    }
+
+    return Input->keys[keycode];
+}
+
+void process_input(input_state *Input)
+{
+
+    if (isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT, Input))
+    {
+        // printf("Mouse button left clicked\n");
+    }
+
+    if (isKeyPressed(GLFW_KEY_A, Input))
+    {
+        // printf("A pressed\n");
+    }
+}
+
 std::vector<Entity*> entities;
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
@@ -59,6 +93,8 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         game_init(GameMemory);
         GameMemory->isInit = true;
     }
+
+    process_input(Input);
 
     for (int i = 0; i < state->entities.size(); i++)
     {
@@ -100,9 +136,9 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
                 entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
             }
         }
-        
+
         int frame = entities[i]->animated_sprite.frame_index;
-        
+
         float tx = (frame % numPerRow) * tw;
         float ty = 1.0f - ((frame / numPerRow) + 1) * th;
 
@@ -272,7 +308,7 @@ void game_init(game_memory *GameMemory)
     entity.animated_sprite.start_frame = 12;
     entity.animated_sprite.end_frame = 15;
     entity.animated_sprite.frame_duration = 0.25f;
-    
+
     entity.transform.rotation = 0.0f;
 
     render_command load_texture;
@@ -309,7 +345,7 @@ void game_init(game_memory *GameMemory)
     entity2.animated_sprite.start_frame = 12;
     entity2.animated_sprite.end_frame = 15;
     entity2.animated_sprite.frame_duration = 0.25f;
-    
+
     entity2.transform.rotation = 0.0f;
     state->entities.push_back(entity2);
 }
