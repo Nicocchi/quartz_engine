@@ -1,6 +1,5 @@
 #include "game.hpp"
 #include <random>
-// unitybuild
 #include <cstdio>
 
 // Layer - z-index [X]
@@ -202,29 +201,10 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
             entities[i]->animated_sprite.frame_index++;
 
-
-            // if (entities[i]->animated_sprite.frame_index >= entities[i]->animated_sprite.start_frame
-            //     && entities[i]->animated_sprite.frame_index <= entities[i]->animated_sprite.end_frame)
-            // {
-            //     if (entities[i]->animated_sprite.changed)
-            //     {
-            //         entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
-            //     }
-            //     else
-            //     {
-            //         entities[i]->animated_sprite.frame_index++;
-            //     }
-            // }
-            // else
-            // {
-            //     entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
-            // }
-
             if (entities[i]->animated_sprite.frame_index > entities[i]->animated_sprite.end_frame)
             {
                 entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
             }
-            // state->entities[0].animated_sprite.changed = false;
         }
 
         int frame = entities[i]->animated_sprite.frame_index;
