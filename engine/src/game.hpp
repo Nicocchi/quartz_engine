@@ -14,6 +14,7 @@ struct game_state
     std::vector<Entity*> entities_sorted;
     std::atomic<unsigned int> nextID;
     unsigned int selected_entity = 0;
+    unsigned int selected_tile = -1;
     bool g_Running;
 };
 

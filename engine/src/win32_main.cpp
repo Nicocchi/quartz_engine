@@ -154,7 +154,7 @@ int main()
 
         // IMGUI Editor
         // TODO (Nico): Add option to enable/disable
-        show_editor(render_state, fps, window->Input, &GameMemory);
+        show_editor(render_state, fps, window->Input, &GameMemory, window);
 
         window_swap_buffers(window);
     }

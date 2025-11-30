@@ -52,6 +52,8 @@ struct Editor
 
     // Temp
     Texture2D *sprite_temp;
+    Texture2D *tilemap_temp;
+    Tile tile;
 } editor;
 
 void init_editor(Window *window);
