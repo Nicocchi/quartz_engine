@@ -6,7 +6,7 @@ bool LoadTexture(Texture2D *texture, const char *path, bool flip)
     if (data == nullptr)
     {
         // error
-        printf("Error loading texture: %s\n", path);
+        printf("Texture2D: Error loading texture: %s\n", path);
     }
 
     

@@ -1,11 +1,42 @@
 #pragma once
 
+#include <unordered_map>
+#include <string>
+
 typedef uint32_t flag_t;
 enum
 {
     ENTITY_SPRITE =          (1 << 0),
     ENTITY_ANIMATED_SPRITE = (1 << 1),
     ENTITY_TILEMAP =         (1 << 2),
+};
+
+struct GridCoord
+{
+    int col;
+    int row;
+
+    bool operator==(const GridCoord& other) const {
+        return col == other.col && row == other.row;
+    }
+};
+
+struct GridCoordHash
+{
+    std::size_t operator()(const GridCoord& c) const {
+        // 64-bit mix
+        uint64_t key = ((uint64_t)(uint32_t)c.col << 32) ^ (uint32_t)c.row;
+
+        // SplitMix64 finalizer
+        key ^= key >> 33;
+        key *= 0xff51afd7ed558ccdULL;
+        key ^= key >> 33;
+        key *= 0xc4ceb9fe1a85ec53ULL;
+        key ^= key >> 33;
+
+        return (size_t)key;
+    }
+
 };
 
 struct Transform
@@ -23,6 +54,7 @@ struct Sprite
     int z_index = 0;
     bool flip_x = false;
     bool flip_y = false;
+    std::string filename;
 };
 
 struct AnimatedSprite
@@ -55,19 +87,19 @@ struct Tile
 struct Tilemap
 {
     unsigned int id;
-    Sprite sprite;
     int cell_width = 8;
     int cell_height = 8;
     int texture_width, texture_height;
     std::vector<Tile> tiles;
-    std::vector<Tile> map;
+    std::unordered_map<GridCoord, Tile, GridCoordHash> map;
     bool enabled = false;
 };
 
 struct Entity
 {
     unsigned int id;
-    const char *name;
+    // const char *name;
+    std::string name;
     size_t vertexOffset = 0; // index into the shared vertex buffer
 
     struct Entity *parent;
@@ -82,4 +114,17 @@ struct Entity
     Tilemap tilemap;
 
     flag_t flags;
+};
+
+struct Scene
+{
+    unsigned int id;
+    // const char *name;
+    std::string name;
+
+    // Entity management
+    std::vector<Entity> entities;
+    std::vector<Entity*> entities_sorted;
+    unsigned int selected_entity = 0;
+    unsigned int selected_tile = -1;
 };

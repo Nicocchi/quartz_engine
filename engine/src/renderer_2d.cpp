@@ -28,7 +28,7 @@ void init_renderer(render_context *context, const float width, const float heigh
         1.0f, 0.0f,  // Top-Right
         1.0f, 1.0f   // Bottom-Right
     };
-    
+
     GLuint pos_index = glGetAttribLocation(context->shader.ID, "pos");
     GLuint uv_index = glGetAttribLocation(context->shader.ID, "uv");
     GLuint color_index = glGetAttribLocation(context->shader.ID, "aColor");
@@ -44,15 +44,15 @@ void init_renderer(render_context *context, const float width, const float heigh
     // Element indices
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, context->EBO);
     // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    
-    
+
+
     // Vertex positions
     glBindBuffer(GL_ARRAY_BUFFER, context->VBO);
     // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(pos_index, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)0);
     glEnableVertexAttribArray(0);
 
-    
+
     // UVs
     // glBindBuffer(GL_ARRAY_BUFFER, context->UVO);
     // glBufferData(GL_ARRAY_BUFFER, sizeof(uv_data), uv_data, GL_STATIC_DRAW);
@@ -99,7 +99,7 @@ void draw_scene(render_context *context)
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, context->EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * context->indexCount, context->indices, GL_DYNAMIC_DRAW);
-    
+
     glUniformMatrix4fv(glGetUniformLocation(context->shader.ID, "projection"), 1, GL_FALSE, (const GLfloat*)&context->projection);
 
     for (; !context->render_commands.empty(); context->render_commands.pop())
@@ -129,7 +129,7 @@ void draw_scene(render_context *context)
                 glUseProgram(context->shader.ID);
 
                 glActiveTexture(GL_TEXTURE0);
-                
+
                 glBindVertexArray(context->VAO);
                 glBindTexture(GL_TEXTURE_2D, textureToBind);
                 // glBindTexture(GL_TEXTURE_2D, context->defaultWhiteTexture);
@@ -140,9 +140,83 @@ void draw_scene(render_context *context)
 
             } break;
 
+            case DRAW_LINE:
+            {
+                glUseProgram(context->shader.ID);
+                // glUniformMatrix4fv(projectionUniformLocation, 1, GL_FALSE, &viewProjection.m0);
+                // glUniform4f(colorUniformLocation, color.x, color.y, color.z, color.w);
+
+                float vertices[] = {
+                    command.line_pos_a.x, command.line_pos_a.y, 0.0f,
+                    command.line_pos_b.x, command.line_pos_b.y, 0.0f
+                };
+
+                glUseProgram(context->shader.ID);
+
+                GLuint vao, vbo;
+                glGenVertexArrays(1, &vao);
+                glGenBuffers(1, &vbo);
+
+                glBindVertexArray(vao);
+                glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                glEnableVertexAttribArray(0);
+
+                glDrawArrays(GL_LINES, 0, 2);
+
+                glDeleteVertexArrays(1, &vao);
+                glDeleteBuffers(1, &vbo);
+            } break;
+
             case COMPILE_SHADER:
             {
                 context->shader = compile_shader(command.shader->vertexPath, command.shader->fragmentPath);
+            } break;
+
+        }
+    }
+
+    for (; !context->editor_render_commands.empty(); context->editor_render_commands.pop())
+    {
+        render_command command = context->editor_render_commands.front();
+
+        switch(command.type)
+        {
+            case UPLOAD:
+            case DRAW_TEXTURE:
+            case COMPILE_SHADER:
+            {
+                return;
+            } break;
+
+            case DRAW_LINE:
+            {
+                glUseProgram(context->shader.ID);
+
+                float vertices[] = {
+                    command.line_pos_a.x, command.line_pos_a.y, 0.0f,
+                    command.line_pos_b.x, command.line_pos_b.y, 0.0f
+                };
+
+                glUseProgram(context->shader.ID);
+
+                GLuint vao, vbo;
+                glGenVertexArrays(1, &vao);
+                glGenBuffers(1, &vbo);
+
+                glBindVertexArray(vao);
+                glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                glEnableVertexAttribArray(0);
+
+                glDrawArrays(GL_LINES, 0, 2);
+
+                glDeleteVertexArrays(1, &vao);
+                glDeleteBuffers(1, &vbo);
             } break;
 
         }
@@ -166,6 +240,7 @@ void check_compile_errors(unsigned int object, std::string type)
         if (!success)
         {
             glGetShaderInfoLog(object, 1024, NULL, infoLog);
+            printf("Shader: %s", infoLog);
         }
     }
     else
@@ -174,6 +249,7 @@ void check_compile_errors(unsigned int object, std::string type)
         if (!success)
         {
             glGetProgramInfoLog(object, 1024, NULL, infoLog);
+            printf("Program: %s", infoLog);
         }
     }
 }
@@ -190,7 +266,7 @@ std::string read_file(const std::string& filepath) {
 
 render_shader compile_shader(const char *vPath, const char *fPath)
 {
-    
+
     std::string vertexSourceS = read_file(vPath);
     std::string fragmentSourceS = read_file(fPath);
     const char *vertexSource = vertexSourceS.c_str();
@@ -217,7 +293,7 @@ render_shader compile_shader(const char *vPath, const char *fPath)
 
     glLinkProgram(shader.ID);
     check_compile_errors(shader.ID, "PROGRAM");
-    
+
     glDeleteShader(sVertex);
     glDeleteShader(sFragment);
 
@@ -275,6 +351,14 @@ void bind_framebuffer(render_framebuffer *fbo, float width, float height)
 void unbind_framebuffer()
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_framebuffer(render_framebuffer *fbo, float width, float height)
+{
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo->fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, fbo->width, fbo->height, 0, 0, width, height,
+        GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 void delete_framebuffer(render_framebuffer *fbo)
 {

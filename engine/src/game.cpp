@@ -2,6 +2,8 @@
 #include <random>
 #include <cstdio>
 
+// #include "save.hpp"
+
 // Layer - z-index [X]
 //  don't change original order
 //  secondary list of pointers to each entity and sort that based on z-index (per frame - discard after)
@@ -49,8 +51,8 @@ void game_init(game_memory *GameMemory);
 
 bool compareEntities(const Entity *a, const Entity *b)
 {
-    int az = a->tilemap.enabled ? a->tilemap.sprite.z_index : a->sprite.z_index;
-    int bz = b->tilemap.enabled ? b->tilemap.sprite.z_index : b->sprite.z_index;
+    int az = a->tilemap.enabled ? a->sprite.z_index : a->sprite.z_index;
+    int bz = b->tilemap.enabled ? b->sprite.z_index : b->sprite.z_index;
     return az < bz;
 }
 
@@ -75,98 +77,108 @@ bool isKeyPressed(unsigned int keycode, input_state *Input)
 }
 
 unsigned int previous_keycode;
+Texture2D *player_idle;
+Texture2D *player_walk;
+Texture2D *overworld_grass;
 
 void process_input(render_context *render_state, game_state *state, input_state *Input, float dt)
 {
-    float velocity = 300 * dt;
+    float velocity = 50 * dt;
     if (isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT, Input))
     {
 
     }
 
-    if (isKeyPressed(GLFW_KEY_A, Input))
-    {
+    state->scenes[state->current_scene].entities[0].sprite.texture = player_idle;
+    // state->entities[0].sprite.texture = player_idle;
 
-        state->entities[0].transform.position.x -= velocity;
-        state->entities[0].animated_sprite.start_frame = 8;
-        state->entities[0].animated_sprite.end_frame = 11;
-        if (previous_keycode != GLFW_KEY_A && !state->entities[0].animated_sprite.changed)
+    if (Input->keys[GLFW_KEY_A] && !Input->keys[GLFW_KEY_W] && Input->keys[GLFW_KEY_A] && !Input->keys[GLFW_KEY_S])
+    {
+        state->scenes[state->current_scene].entities[0].transform.position.x -= velocity;
+        state->scenes[state->current_scene].entities[0].animated_sprite.start_frame = 8;
+        state->scenes[state->current_scene].entities[0].animated_sprite.end_frame = 11;
+        if (previous_keycode != GLFW_KEY_A && !state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
             previous_keycode = GLFW_KEY_A;
-            state->entities[0].animated_sprite.changed = true;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = true;
         }
-        if (state->entities[0].animated_sprite.changed)
+        if (state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
-            state->entities[0].animated_sprite.frame_index = 8;
-            state->entities[0].animated_sprite.changed = false;
+            state->scenes[state->current_scene].entities[0].animated_sprite.frame_index = 8;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = false;
         }
-        state->entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].sprite.texture = player_walk;
     }
 
-    if (isKeyPressed(GLFW_KEY_D, Input))
+    if (Input->keys[GLFW_KEY_D] && !Input->keys[GLFW_KEY_W] && Input->keys[GLFW_KEY_D] && !Input->keys[GLFW_KEY_S])
     {
-        state->entities[0].transform.position.x += velocity;
-        state->entities[0].animated_sprite.start_frame = 4;
-        state->entities[0].animated_sprite.end_frame = 7;
+        state->scenes[state->current_scene].entities[0].transform.position.x += velocity;
+        state->scenes[state->current_scene].entities[0].animated_sprite.start_frame = 4;
+        state->scenes[state->current_scene].entities[0].animated_sprite.end_frame = 7;
 
-        if (previous_keycode != GLFW_KEY_D && !state->entities[0].animated_sprite.changed)
+        if (previous_keycode != GLFW_KEY_D && !state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
             previous_keycode = GLFW_KEY_D;
-            state->entities[0].animated_sprite.changed = true;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = true;
         }
-        if (state->entities[0].animated_sprite.changed)
+        if (state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
-            state->entities[0].animated_sprite.frame_index = 4;
-            state->entities[0].animated_sprite.changed = false;
+            state->scenes[state->current_scene].entities[0].animated_sprite.frame_index = 4;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = false;
         }
-        state->entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].sprite.texture = player_walk;
     }
 
-    if (isKeyPressed(GLFW_KEY_W, Input))
+    if (Input->keys[GLFW_KEY_W])
     {
-        state->entities[0].transform.position.y += velocity;
-        state->entities[0].animated_sprite.start_frame = 0;
-        state->entities[0].animated_sprite.end_frame = 3;
+        state->scenes[state->current_scene].entities[0].transform.position.y += velocity;
+        state->scenes[state->current_scene].entities[0].animated_sprite.start_frame = 0;
+        state->scenes[state->current_scene].entities[0].animated_sprite.end_frame = 3;
 
-        if (previous_keycode != GLFW_KEY_W && !state->entities[0].animated_sprite.changed)
+        if (previous_keycode != GLFW_KEY_W && !state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
             previous_keycode = GLFW_KEY_W;
-            state->entities[0].animated_sprite.changed = true;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = true;
         }
-        if (state->entities[0].animated_sprite.changed)
+        if (state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
-            state->entities[0].animated_sprite.frame_index = 0;
-            state->entities[0].animated_sprite.changed = false;
+            state->scenes[state->current_scene].entities[0].animated_sprite.frame_index = 0;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = false;
         }
-        state->entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].sprite.texture = player_walk;
     }
 
-    if (isKeyPressed(GLFW_KEY_S, Input))
+    if (Input->keys[GLFW_KEY_S])
     {
-        state->entities[0].transform.position.y -= velocity;
-        state->entities[0].animated_sprite.start_frame = 12;
-        state->entities[0].animated_sprite.end_frame = 14;
+        state->scenes[state->current_scene].entities[0].transform.position.y -= velocity;
+        state->scenes[state->current_scene].entities[0].animated_sprite.start_frame = 12;
+        state->scenes[state->current_scene].entities[0].animated_sprite.end_frame = 14;
 
-        if (previous_keycode != GLFW_KEY_S && !state->entities[0].animated_sprite.changed)
+        if (previous_keycode != GLFW_KEY_S && !state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
             previous_keycode = GLFW_KEY_S;
-            state->entities[0].animated_sprite.changed = true;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = true;
         }
-        if (state->entities[0].animated_sprite.changed)
+        if (state->scenes[state->current_scene].entities[0].animated_sprite.changed)
         {
-            state->entities[0].animated_sprite.frame_index = 12;
-            state->entities[0].animated_sprite.changed = false;
+            state->scenes[state->current_scene].entities[0].animated_sprite.frame_index = 12;
+            state->scenes[state->current_scene].entities[0].animated_sprite.changed = false;
         }
-        state->entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].dirty = true;
+        state->scenes[state->current_scene].entities[0].sprite.texture = player_walk;
     }
 
-    // render_state->camera->position.x = state->entities[0].transform.position.x;
-    // render_state->camera->position.y = state->entities[0].transform.position.y;
+    render_state->camera->position.x = state->scenes[state->current_scene].entities[0].transform.position.x;
+    render_state->camera->position.y = state->scenes[state->current_scene].entities[0].transform.position.y;
     // Smooth follow
-    render_state->camera->position += (state->entities[0].transform.position - render_state->camera->position) * 10.0f * dt;
+    // render_state->camera->position += (state->entities[0].transform.position - render_state->camera->position) * 10.0f * dt;
 }
 
 std::vector<Entity*> entities;
+
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     game_state *state = (game_state*)GameMemory->storage;
@@ -179,22 +191,23 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         GameMemory->isInit = true;
     }
 
-    process_input(render_state, state, Input, deltaTime);
-
-
+    // process_input(render_state, state, Input, deltaTime);
 
     entities.clear();
-    for (int i = 0; i < state->entities.size(); i++)
+    for (int i = 0; i < state->scenes[state->current_scene].entities.size(); i++)
     {
-        entities.push_back(&state->entities[i]);
+        // entities.push_back(&state->entities[i]);
+        entities.push_back(&state->scenes[state->current_scene].entities[i]);
     }
     std::sort(entities.begin(), entities.end(), compareEntities);
 
-    for (int i = 0; i <entities.size(); i++)
+    for (int i = 0; i < entities.size(); i++)
     {
         if (!entities[i]->tilemap.enabled)
         {
-            state->entities[i].dirty = false;
+            entities[i]->dirty = false;
+            // state->scenes[state->current_scene].entities[i].dirty = false;
+            // state->entities[i].dirty = false;
 
             render_command draw_texture;
             draw_texture.type = DRAW_TEXTURE;
@@ -202,7 +215,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
             draw_texture.texture = entities[i]->sprite.texture;
 
             Vector2 pos = entities[i]->transform.position;
-            Vector2 esize = entities[i]->transform.size;
+            Vector2 esize = entities[i]->transform.size * entities[i]->transform.scale;
             float rotation = entities[i]->transform.rotation;
 
             vertex *v = &render_state->vertices[render_state->vertexCount];
@@ -331,17 +344,19 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         }
         else
         {
-            for (int t = 0; t < entities[i]->tilemap.map.size(); t++)
+            // for (int t = 0; t < entities[i]->tilemap.map.size(); t++)
+            for (auto& pair : entities[i]->tilemap.map)
             {
-                Tile mtile = entities[i]->tilemap.map[t];
+                // Tile mtile = entities[i]->tilemap.map[t];
+                Tile &mtile = pair.second;
 
                 render_command draw_texture;
                 draw_texture.type = DRAW_TEXTURE;
                 draw_texture.id = mtile.id;
-                draw_texture.texture = entities[i]->tilemap.sprite.texture;
+                draw_texture.texture = entities[i]->sprite.texture;
 
                 Vector2 pos = mtile.transform.position;
-                Vector2 esize = mtile.transform.size;
+                Vector2 esize = mtile.transform.size * mtile.transform.scale;
                 float rotation = mtile.transform.rotation;
 
                 vertex *v = &render_state->vertices[render_state->vertexCount];
@@ -354,22 +369,22 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
                 // Top-left vertex
                 v[0].position = pos;
                 v[0].texCoords = {u0, v1};
-                v[0].color = entities[i]->tilemap.sprite.color;
+                v[0].color = entities[i]->sprite.color;
 
                 // Top-right vertex
                 v[1].position = {pos.x + esize.x, pos.y};
                 v[1].texCoords = {u1, v1};
-                v[1].color = entities[i]->tilemap.sprite.color;
+                v[1].color = entities[i]->sprite.color;
 
                 // Bottom-right vertex
                 v[2].position = {pos.x + esize.x, pos.y + esize.y};
                 v[2].texCoords = {u1, v0};
-                v[2].color = entities[i]->tilemap.sprite.color;
+                v[2].color = entities[i]->sprite.color;
 
                 // Bottom-left vertex
                 v[3].position = {pos.x, pos.y + esize.y};
                 v[3].texCoords = {u0, v0};
-                v[3].color = entities[i]->tilemap.sprite.color;
+                v[3].color = entities[i]->sprite.color;
 
                 // Handle rotation if needed
                 if (rotation != 0)
@@ -415,9 +430,15 @@ void game_init(game_memory *GameMemory)
     game_state *state = (game_state*)GameMemory->storage;
     render_context *render_state = (render_context*)GameMemory->renderStorage;
 
-    state->entities.clear();
-    state->entities_sorted.clear();
-    state->selected_entity = 0;
+    render_state->camera->zoom = 12.0f;
+
+    player_idle = new Texture2D();
+    player_walk = new Texture2D();
+    overworld_grass = new Texture2D();
+
+    // state->entities.clear();
+    // state->entities_sorted.clear();
+    // state->selected_entity = 0;
 
     render_state->color.r = 66.0f / 255;
     render_state->color.g = 135.0f / 255;
@@ -443,14 +464,16 @@ void game_init(game_memory *GameMemory)
     entity.name = "Player";
     entity.transform.position.x = -91;
     entity.transform.position.y = -91;
-    entity.transform.size.x = 240.0f;
-    entity.transform.size.y = 240.0f;
+    entity.transform.size.x = 16.0f;
+    entity.transform.size.y = 16.0f;
+    entity.transform.scale = {1, 1};
     entity.transform.rotation = 0.0f;
     entity.dirty = true;
 
     entity.flags = ENTITY_SPRITE | ENTITY_ANIMATED_SPRITE;
 
-    entity.sprite.texture = new Texture2D();
+    entity.sprite.texture = player_idle;
+    entity.sprite.filename = "assets/textures/FD_Character_007_Idle.png";
     entity.sprite.texture->isLoadedGPU = false;
     entity.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
     entity.sprite.z_index = 1;
@@ -469,17 +492,27 @@ void game_init(game_memory *GameMemory)
 
     entity.tilemap.enabled = false;
 
-    render_command load_texture;
-    load_texture.type = UPLOAD;
-    load_texture.filePath = "assets/textures/FD_Character_007_Idle.png";
-    load_texture.texture = entity.sprite.texture;
-    render_state->render_commands.push(load_texture);
+    // render_command load_texture;
+    // load_texture.type = UPLOAD;
+    // load_texture.filePath = "assets/textures/FD_Character_007_Idle.png";
+    // load_texture.texture = entity.sprite.texture;
+    // render_state->render_commands.push(load_texture);
+
+    render_command player_idle_cmd;
+    player_idle_cmd.type = UPLOAD;
+    player_idle_cmd.filePath = "assets/textures/FD_Character_007_Idle.png";
+    player_idle_cmd.texture = player_idle;
+    render_state->render_commands.push(player_idle_cmd);
+
+    render_command player_walk_cmd;
+    player_walk_cmd.type = UPLOAD;
+    player_walk_cmd.filePath = "assets/textures/FD_Character_007.png";
+    player_walk_cmd.texture = player_walk;
+    render_state->render_commands.push(player_walk_cmd);
 
 
 
-    state->entities.push_back(entity);
-
-    state->selected_entity = 0;
+    // state->entities.push_back(entity);
 
     Entity entity2;
     entity2.id = state->nextID++;
@@ -488,26 +521,28 @@ void game_init(game_memory *GameMemory)
     entity2.transform.position.y = -91;
     entity2.transform.size.x = 240.0f;
     entity2.transform.size.y = 240.0f;
+    entity2.transform.scale = {1, 1};
     entity2.transform.rotation = 0.0f;
     entity2.dirty = true;
 
     entity2.flags = ENTITY_TILEMAP;
 
-    entity2.tilemap.sprite.texture = new Texture2D();
-    entity2.tilemap.sprite.texture->isLoadedGPU = false;
-    entity2.tilemap.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
-    entity2.tilemap.sprite.z_index = 0;
+    entity2.sprite.texture = overworld_grass;
+    entity2.sprite.filename = "assets/textures/overworld2.png";
+    entity2.sprite.texture->isLoadedGPU = false;
+    entity2.sprite.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    entity2.sprite.z_index = 0;
     entity2.tilemap.id = state->nextID++;
-    entity2.tilemap.texture_width = 96;
-    entity2.tilemap.texture_height = 192;
+    entity2.tilemap.texture_width = 128;
+    entity2.tilemap.texture_height = 256;
     entity2.tilemap.cell_width = 16;
     entity2.tilemap.cell_height = 16;
     entity2.tilemap.enabled = true;
 
     render_command load_tilemap_texture;
     load_tilemap_texture.type = UPLOAD;
-    load_tilemap_texture.filePath = "assets/textures/overworld.png"; // Change to your tilemap texture path
-    load_tilemap_texture.texture = entity2.tilemap.sprite.texture;
+    load_tilemap_texture.filePath = "assets/textures/overworld2.png";
+    load_tilemap_texture.texture = overworld_grass;
     render_state->render_commands.push(load_tilemap_texture);
 
     int cellW = entity2.tilemap.cell_width;
@@ -524,10 +559,10 @@ void game_init(game_memory *GameMemory)
 
     for (int i = 0; i < tileCount; i++)
     {
-        if (i == 3 || i == 4 || i == 5 || i == 10 || i == 11 || i == 17 || i == 23)
-        {
-            continue;
-        }
+        // if (i == 3 || i == 4 || i == 5 || i == 10 || i == 11 || i == 17 || i == 23)
+        // {
+        //     continue;
+        // }
         int x = i % tilesX;
         int y = i / tilesX;
 
@@ -536,6 +571,8 @@ void game_init(game_memory *GameMemory)
         float u1 = u0 + uvW;
         float v1 = v0 + uvH;
         Tile tile;
+        tile.transform.size = {16, 16};
+        tile.transform.scale = {1, 1};
         tile.id = state->nextID++;
         tile.u0 = u0;
         tile.v0 = v0;
@@ -544,31 +581,28 @@ void game_init(game_memory *GameMemory)
         entity2.tilemap.tiles.push_back(tile);
     }
 
-    Vector2 pos = { -2400.0f, 1600.0f };
-    for (int i = 0; i < 1000; i++)
-    {
-        Tile tiled;
-        tiled.id = state->nextID++;
-        tiled.transform.position = pos;
-        float size = 273.0f;
-        pos.x += size;
-        if (pos.x > 2400.0f)
-        {
-            pos.x = -2400.0f;
-            pos.y -= size;
-        }
-        tiled.transform.size.x = size;
-        tiled.transform.size.y = size;
-        int min = 0;
-        int max = 9;
-        int randidx = (rand() % (max - min + 1)) + min;
-        tiled.u0 = entity2.tilemap.tiles[randidx].u0;
-        tiled.v0 = entity2.tilemap.tiles[randidx].v0;
-        tiled.u1 = entity2.tilemap.tiles[randidx].u1;
-        tiled.v1 = entity2.tilemap.tiles[randidx].v1;
-        tiled.index = randidx;
-        entity2.tilemap.map.push_back(tiled);
-    }
+    // state->entities.push_back(entity2);
+    
 
-    state->entities.push_back(entity2);
+    Scene main;
+    
+    main.entities.clear();
+    main.entities_sorted.clear();
+    main.selected_entity = 0;
+
+    main.entities.push_back(entity);
+    main.entities.push_back(entity2);
+
+    state->scenes.push_back(main);
+
+    Scene two;
+    two.entities.clear();
+    two.entities_sorted.clear();
+    two.selected_entity = 0;
+    two.entities.push_back(entity);
+    state->scenes.push_back(two);
+
+    state->current_scene = 0;
+
+    // load_scene(state, "scene4");
 }

@@ -7,6 +7,7 @@ enum RENDER_TYPE
 {
     UPLOAD,
     DRAW_TEXTURE,
+    DRAW_LINE,
     COMPILE_SHADER,
 };
 
@@ -55,6 +56,8 @@ struct render_command
         render_shader *shader;
     };
     Vector4 color;
+    Vector2 line_pos_a;
+    Vector2 line_pos_b;
 };
 
 
@@ -62,6 +65,7 @@ struct render_command
 struct render_context
 {
     std::queue<render_command> render_commands;
+    std::queue<render_command> editor_render_commands;
     unsigned int quadVAO;
     unsigned int VAO;
     unsigned int EBO;

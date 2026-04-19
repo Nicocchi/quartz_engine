@@ -13,6 +13,7 @@
 #include <map>
 #include <queue>
 #include <filesystem>
+#include <unordered_map>
 
 #include "raymath_ext.h"
 

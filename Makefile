@@ -19,6 +19,7 @@ TIMESTAMP := $(shell date +"%s")
 
 engine:
 	rm -rf $(BUILD_DIR)/$(TARGET).*
+	# $(CXX) $(CXX_STD) $(DEFINES) $(INCLUDES) $(VENDOR_INC) -g $(SRC) -o $(BUILD_DIR)/$(TARGET).exe $(LIBS) $(WARNINGS) $(PCH) -ftime-report 2> file.txt -ftime-trace=file.json --analyze -Xanalyzer -analyzer-output=html -o ./
 	$(CXX) $(CXX_STD) $(DEFINES) $(INCLUDES) $(VENDOR_INC) -g $(SRC) -o $(BUILD_DIR)/$(TARGET).exe $(LIBS) $(WARNINGS) $(PCH)
 
 game:

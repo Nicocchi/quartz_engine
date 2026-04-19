@@ -40,5 +40,10 @@
 # debug information files
 *.dwo
 
+.vs/
 .vscode/
+.history/
+.zed/
 build/
+_build_cache.cmd
+*.rdbg

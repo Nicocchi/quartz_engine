@@ -61,6 +61,26 @@ void unloadGameCode(game_code *gc)
     }
 }
 
+bool display_editor = true;
+
+bool isKeyPressed(unsigned int keycode, input_state *Input)
+{
+    if (keycode >= 1024)
+    {
+        return false;
+    }
+
+    return Input->keys[keycode];
+}
+void process_input(input_state *Input)
+{
+    if (Input->keys[GLFW_KEY_F1] && !Input->keys_processed[GLFW_KEY_F1])
+    {
+        display_editor = !display_editor;
+        Input->keys_processed[GLFW_KEY_F1] = true;
+    }
+}
+
 int main()
 {
 
@@ -103,7 +123,10 @@ int main()
 
     // IMGUI Editor
     // TODO (Nico): Add option to enable/disable
-    init_editor(window);
+    if (display_editor)
+    {
+        init_editor(window);
+    }
 
     while(!window_closed(window))
     {
@@ -114,6 +137,10 @@ int main()
         {
             // display frame count
             fps = frameCount;
+            if (!display_editor)
+            {
+                printf("%d\n", fps);
+            }
             frameCount = 0;
             previousTime = currentFrame;
         }
@@ -126,13 +153,14 @@ int main()
         {
             unloadGameCode(&gameCode);
             gameCode = loadGameCode("game.dll", "game_temp.dll");
-            GameMemory.isInit = false;
+            // GameMemory.isInit = false;
             printf("Hot reloaded game.dll\n");
         }
 
         // Things should go in this order:
         //  Poll -> Update -> Render
         window_poll();
+        process_input(window->Input);
         render_state->projection = create_projection(camera.zoom, camera.position, camera.rotation, 1280, 720);
 
         render_state->vertexCount = 0;
@@ -149,19 +177,30 @@ int main()
         window_clear(render_state->color);
 
         draw_scene(render_state);
+        if (!display_editor)
+        {
+            draw_framebuffer(render_state->fbo, window->width, window->height);
+        }
 
         unbind_framebuffer();
 
         // IMGUI Editor
         // TODO (Nico): Add option to enable/disable
-        show_editor(render_state, fps, window->Input, &GameMemory, window);
+        if (display_editor)
+        {
+            process_editor_input(render_state, window->Input, deltaTime);
+            show_editor(render_state, fps, window->Input, &GameMemory, window);
+        }
 
         window_swap_buffers(window);
     }
 
     // IMGUI Editor
     // TODO (Nico): Add option to enable/disable
-    close_editor();
+    if (display_editor)
+    {
+        close_editor();
+    }
 
     // delete editor;
     delete window;

@@ -15,6 +15,10 @@ struct game_state
     std::atomic<unsigned int> nextID;
     unsigned int selected_entity = 0;
     unsigned int selected_tile = -1;
+
+    
+    std::vector<Scene> scenes;
+    unsigned int current_scene;
     bool g_Running;
 };
 

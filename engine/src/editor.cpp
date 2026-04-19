@@ -1,4 +1,6 @@
 #include "game.hpp"
+#include "save.cpp"
+#include <stdio.h>
 
 static bool opt_fullscreen = true;
 static bool opt_padding = false;
@@ -7,16 +9,6 @@ ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDo
 
 int previewSize = 48;
 int padding = 16;
-
-// Converts a std::filesystem string into a std::string
-std::string canonical_to_string(const std::filesystem::path &p)
-{
-    try {
-        return std::filesystem::weakly_canonical(p).string();
-    } catch(...) {
-        return p.lexically_normal().string();
-    }
-}
 
 // Iterates over a given directory and adds it to a list. This is to
 // reduce calls to hit the os filesystem reads
@@ -37,6 +29,8 @@ void build_assets(const std::filesystem::path &root)
         node.path = directory_entry.path();
         node.filename = relative_path.filename().string();
 
+        
+
         if (directory_entry.is_directory())
         {
             node.isDirectory = true;
@@ -44,14 +38,31 @@ void build_assets(const std::filesystem::path &root)
 
         if (directory_entry.path().extension() == ".png")
         {
-            // std::cout << directory_entry.path().extension() << std::endl;
+            node.isDirectory = false;
             node.texture = new Texture2D();
             LoadTexture(node.texture, directory_entry.path().string().c_str(), true);
+        }
+
+        if (directory_entry.path().extension() == ".bin")
+        {
+            node.isDirectory = false;
         }
 
         content_browser.files.emplace_back(node);
     }
 }
+
+// Converts a std::filesystem string into a std::string
+std::string canonical_to_string(const std::filesystem::path &p)
+{
+    try {
+        return std::filesystem::weakly_canonical(p).string();
+    } catch(...) {
+        return p.lexically_normal().string();
+    }
+}
+
+
 
 // Default theme
 void SetupImGuiStyle()
@@ -165,7 +176,7 @@ void init_editor(Window *window)
 
     // Content browser
     content_browser.asset_path = "assets";
-    content_browser.current_directory = content_browser.asset_path;
+    content_browser.current_directory = "assets";
     content_browser.current_filename = "assets";
     content_browser.padding = 16;
     content_browser.thumbnail_size = 90;
@@ -183,6 +194,16 @@ void init_editor(Window *window)
 
 bool open = true;
 
+void AddLog(const char* fmt, ...)
+{
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+    va_end(args);
+    editor.log_messages.push_back(buf);
+}
+
 ImVec4 Vec4ToImVec4(const Vector4& v) {
     return ImVec4(v.x, v.y, v.z, v.w);
 }
@@ -191,15 +212,169 @@ Vector4 ImVec4ToVec4(const ImVec4& v) {
     return Vector4{v.x, v.y, v.z, v.w };
 }
 
+Vector4 Vector4Transform(Vector4 v, Matrix m)
+{
+    Vector4 result;
+
+    result.x = v.x*m.m0  + v.y*m.m4  + v.z*m.m8  + v.w*m.m12;
+    result.y = v.x*m.m1  + v.y*m.m5  + v.z*m.m9  + v.w*m.m13;
+    result.z = v.x*m.m2  + v.y*m.m6  + v.z*m.m10 + v.w*m.m14;
+    result.w = v.x*m.m3  + v.y*m.m7  + v.z*m.m11 + v.w*m.m15;
+
+    return result;
+}
+
+Vector2 ScreenToWorld(const Vector2& mouse, const Matrix& projection, int screenWidth, int screenHeight)
+{
+    // Convert screen → clip
+    float x =  (2.0f * mouse.x) / screenWidth - 1.0f;
+    float y = -(2.0f * mouse.y) / screenHeight + 1.0f; // ImGui has Y flipped
+
+    Vector4 clip = { x, y, 0.0f, 1.0f };
+
+    Matrix columnMajorVP = MatrixTranspose(projection);
+    Matrix invViewProj = MatrixInvert(columnMajorVP);
+    Vector4 world = Vector4Transform(clip, invViewProj);
+
+    return { world.x, world.y };
+}
+
+void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *context)
+{
+    Vector2 tilemapPos = entity.transform.position;
+    float cw = entity.tilemap.cell_width;
+    float ch = entity.tilemap.cell_height;
+    int gridStartX = (int)floor((context->camera->position.x - 1280/2 - tilemapPos.x) / cw) - 1;
+    int gridEndX = (int)ceil((context->camera->position.x + 1280/2 - tilemapPos.x) / cw) + 1;
+    int gridStartY = (int)floor((context->camera->position.y - 720/2 - tilemapPos.y) / ch) - 1;
+    int gridEndY = (int)ceil((context->camera->position.y + 720/2 - tilemapPos.y) / ch) + 1;
+
+    Vector4 gridColor = {0.3f, 0.3f, 0.3f, 0.5f};  // Semi-transparent gray
+
+    // Draw vertical lines
+    for (int col = gridStartX; col <= gridEndX; col++)
+    {
+        float x = tilemapPos.x + col * cw;
+        float y1 = tilemapPos.y + gridStartY * ch;
+        float y2 = tilemapPos.y + gridEndY * ch;
+
+        render_command draw_line;
+        draw_line.type = DRAW_LINE;
+        draw_line.id = entity.id;
+        draw_line.color = gridColor;
+        draw_line.line_pos_a.x = x;
+        draw_line.line_pos_a.y = y1;
+        draw_line.line_pos_b.x = x;
+        draw_line.line_pos_b.y = y2;
+        context->editor_render_commands.push(draw_line);
+    }
+
+    // Draw horizontal lines
+    for (int row = gridStartY; row <= gridEndY; row++)
+    {
+        float y = tilemapPos.y + row * ch;
+        float x1 = tilemapPos.x + gridStartX * cw;
+        float x2 = tilemapPos.x + gridEndX * cw;
+
+        render_command draw_line;
+        draw_line.type = DRAW_LINE;
+        draw_line.id = entity.id;
+        draw_line.color = gridColor;
+        draw_line.line_pos_a.x = x1;
+        draw_line.line_pos_a.y = y;
+        draw_line.line_pos_b.x = x2;
+        draw_line.line_pos_b.y = y;
+        context->editor_render_commands.push(draw_line);
+    }
+}
+
+void process_editor_input(render_context *render_state, input_state *Input, float dt)
+{
+    float velocity = 50 * dt;
+
+    if (Input->keys[GLFW_KEY_A])
+    {
+        render_state->camera->position.x -= velocity;
+    }
+
+    if (Input->keys[GLFW_KEY_D])
+    {
+        render_state->camera->position.x += velocity;
+    }
+
+    if (Input->keys[GLFW_KEY_W])
+    {
+        render_state->camera->position.y += velocity;
+    }
+
+    if (Input->keys[GLFW_KEY_S])
+    {
+        render_state->camera->position.y -= velocity;
+    }
+}
+
 void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window)
 {
     game_state *state = (game_state*)GM->storage;
+    ImGuiIO& io = ImGui::GetIO();
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    // MENU BAR
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Load"))
+            {
+                editor.load_modal_popup = true;
+            }
+            if (ImGui::MenuItem("Save As.."))
+            {
+                editor.save_modal_popup = true;
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+
+    // DOCKSPACE WINDOW
+    float statusBarHeight = ImGui::GetFrameHeight();
+
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + statusBarHeight));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, viewport->Size.y - statusBarHeight));
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags dockspaceFlags =
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_NoBackground |
+        ImGuiWindowFlags_NoDecoration;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,  ImVec2(0.0f, 0.0f));
+
+    ImGui::Begin("##DockspaceWindow", nullptr, dockspaceFlags);
+    ImGui::PopStyleVar(3);
+
     ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-    ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    Scene *game_scene = new Scene();
+    game_scene = &state->scenes[state->current_scene];
+
+    
+    
 
     ImGui::Begin("Scene Hierarchy");
 
@@ -213,27 +388,33 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     ImGuiTreeNodeFlags flag_selected = ImGuiTreeNodeFlags_Selected | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;
     ImGuiTreeNodeFlags flag_unselected = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding;;
 
-    for (int i = 0; i < state->entities.size(); i++)
+    for (int i = 0; i < game_scene->entities.size(); i++)
     {
-        bool isSelected = state->selected_entity == i;
+        bool isSelected = game_scene->selected_entity == i;
         if (isSelected)
         {
             node_flags = flag_selected;
-            if (state->entities[state->selected_entity].flags & ENTITY_SPRITE)
+            if (game_scene->entities[game_scene->selected_entity].flags & ENTITY_SPRITE)
             {
-                editor.sprite_temp = state->entities[i].sprite.texture;
+                editor.sprite_temp = game_scene->entities[i].sprite.texture;
+                editor.selected_tile = -1;
             }
             else
             {
                 editor.sprite_temp = nullptr;
             }
-            if (state->entities[state->selected_entity].flags & ENTITY_TILEMAP)
+            if (game_scene->entities[game_scene->selected_entity].flags & ENTITY_TILEMAP)
             {
-                editor.tilemap_temp = state->entities[i].tilemap.sprite.texture;
+                editor.tilemap_temp = game_scene->entities[i].sprite.texture;
+                if (editor.draw_grid)
+                {
+                    DrawTilemapGrid(game_scene->entities[game_scene->selected_entity], context->projection, context);
+                }
             }
             else
             {
                 editor.tilemap_temp = nullptr;
+                editor.selected_tile = -1;
             }
         }
         else
@@ -247,7 +428,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
             ImU32 col = ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderHovered]);
             ImGui::PushStyleColor(ImGuiCol_Header, col);
         }
-        bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)&state->entities[i], node_flags, state->entities[i].name, i);
+        bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)&game_scene->entities[i], node_flags, game_scene->entities[i].name.c_str(), i);
 
         if (isSelected)
         {
@@ -256,7 +437,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         ImGui::PopStyleVar();
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
-            state->selected_entity = i;
+            game_scene->selected_entity = i;
         }
 
         if (node_open)
@@ -272,9 +453,9 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     ImGui::Begin("Inspector");
     ImVec2 available_size = ImGui::GetContentRegionAvail();
     float w_width = available_size.x / 2.5;
-    if (state->entities.size() > 0)
+    if (game_scene->entities.size() > 0)
     {
-        ImGui::Text(state->entities[state->selected_entity].name);
+        ImGui::Text(game_scene->entities[game_scene->selected_entity].name.c_str());
 
         // ============ ENTITY TRANSFORM ============
         ImGui::Spacing();
@@ -284,57 +465,44 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         {
             ImGui::Text("Position");
             ImGui::PushItemWidth(w_width);
-            ImGui::DragFloat("##Entity X", &state->entities[state->selected_entity].transform.position.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
+            ImGui::DragFloat("##Entity X", &game_scene->entities[game_scene->selected_entity].transform.position.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
 
             ImGui::SameLine();
             ImGui::PushItemWidth(w_width);
-            ImGui::DragFloat("##Entity Y", &state->entities[state->selected_entity].transform.position.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
+            ImGui::DragFloat("##Entity Y", &game_scene->entities[game_scene->selected_entity].transform.position.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
-
-            ImGui::SameLine();
-            ImGui::PushItemWidth(w_width - 8.0f);
-            ImGui::PushID("ResetEntityPos");
-            if (ImGui::Button("Reset"))
-            {
-
-            }
-            ImGui::PopItemWidth();
-            ImGui::PopID();
 
             ImGui::Text("Rotation");
             ImGui::PushItemWidth(available_size.x / 2.5);
-            ImGui::DragFloat("##Entity Rotation", &state->entities[state->selected_entity].transform.rotation, 0.01f, -4.0f, 4.0f, "Rotation: %.02f");
+            ImGui::DragFloat("##Entity Rotation", &game_scene->entities[game_scene->selected_entity].transform.rotation, 0.01f, -4.0f, 4.0f, "Rotation: %.02f");
             ImGui::PopItemWidth();
-
-            ImGui::SameLine();
-            ImGui::PushItemWidth(w_width - 8.0f);
-            ImGui::PushID("ResetEntityRotation");
-            if (ImGui::Button("Reset"))
-            {
-
-            }
-            ImGui::PopItemWidth();
-            ImGui::PopID();
 
             ImGui::Text("Size");
             ImGui::PushItemWidth(w_width);
-            ImGui::DragFloat("##Entity Size X", &state->entities[state->selected_entity].transform.size.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
+            ImGui::DragFloat("##Entity Size X", &game_scene->entities[game_scene->selected_entity].transform.size.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
             ImGui::SameLine();
             ImGui::PushItemWidth(w_width);
-            ImGui::DragFloat("##Entity Size Y", &state->entities[state->selected_entity].transform.size.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
+            ImGui::DragFloat("##Entity Size Y", &game_scene->entities[game_scene->selected_entity].transform.size.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
             ImGui::PopItemWidth();
-
-            ImGui::SameLine();
-            ImGui::PushItemWidth(w_width - 8.0f);
-            ImGui::PushID("ResetEntitySize");
-            if (ImGui::Button("Reset"))
+            if (ImGui::IsItemHovered())
             {
-
+                ImGui::SetTooltip("Base size of the entity");
             }
+
+            ImGui::Text("Scale");
+            ImGui::PushItemWidth(w_width);
+            ImGui::DragFloat("##Entity Scale X", &game_scene->entities[game_scene->selected_entity].transform.scale.x, 1.0f, 0.0f, 0.0f, "X: %.02f");
             ImGui::PopItemWidth();
-            ImGui::PopID();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(w_width);
+            ImGui::DragFloat("##Entity Scale Y", &game_scene->entities[game_scene->selected_entity].transform.scale.y, 1.0f, 0.0f, 0.0f, "Y: %.02f");
+            ImGui::PopItemWidth();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Scale of the entity");
+            }
         }
 
 
@@ -342,15 +510,23 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Spacing();
-        if (state->entities[state->selected_entity].flags & ENTITY_TILEMAP)
+        if (game_scene->entities[game_scene->selected_entity].flags & ENTITY_TILEMAP)
         {
+            // TODO: Place into it's own window
             if (ImGui::CollapsingHeader("Tilemap", ImGuiTreeNodeFlags_DefaultOpen))
             {
+
                 ImGui::Text("Texture");
-                ImGui::Image(state->entities[state->selected_entity].tilemap.sprite.texture->ID, ImVec2(state->entities[state->selected_entity].tilemap.sprite.texture->width, state->entities[state->selected_entity].tilemap.sprite.texture->height));
+                if (game_scene->entities[game_scene->selected_entity].sprite.texture)
+                {
+                    ImGui::Image(game_scene->entities[game_scene->selected_entity].sprite.texture->ID, ImVec2(game_scene->entities[game_scene->selected_entity].sprite.texture->width * 0.25f, game_scene->entities[game_scene->selected_entity].sprite.texture->height * 0.25f));
+                }
+                else {
+                    ImGui::Text("Image: No tilemap texture loaded");
+                }
                 if (ImGui::IsItemHovered())
                 {
-                    // ImGui::SetTooltip(state->entities[state->selected_entity].sprite.texture->path);
+                    // ImGui::SetTooltip(game_scene->entities[game_scene->selected_entity].sprite.texture->path);
                 }
                 if (ImGui::BeginDragDropTarget())
                 {
@@ -358,9 +534,9 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                     {
                         const char *payload_data = static_cast<const char*>(payload->Data);
                         std::string path = payload_data;
-                        printf("path? : %s\n", path.c_str());
                         LoadTexture(editor.tilemap_temp, path.c_str());
-                        state->entities[state->selected_entity].tilemap.sprite.texture = editor.tilemap_temp;
+                        game_scene->entities[game_scene->selected_entity].sprite.filename = path.c_str();
+                        game_scene->entities[game_scene->selected_entity].sprite.texture = editor.tilemap_temp;
                     }
 
                     ImGui::EndDragDropTarget();
@@ -368,30 +544,19 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                 ImGui::Text("Cell Size");
                 ImGui::PushItemWidth(w_width);
-                ImGui::DragInt("##Entity Tilemap cell_width", &state->entities[state->selected_entity].tilemap.cell_width);
+                ImGui::DragInt("##Entity Tilemap cell_width", &game_scene->entities[game_scene->selected_entity].tilemap.cell_width);
                 ImGui::SameLine();
-                ImGui::DragInt("##Entity Tilemap cell_height", &state->entities[state->selected_entity].tilemap.cell_height);
+                ImGui::DragInt("##Entity Tilemap cell_height", &game_scene->entities[game_scene->selected_entity].tilemap.cell_height);
                 ImGui::PopItemWidth();
 
                 ImGui::Text("Texture Size");
                 ImGui::PushItemWidth(w_width);
-                ImGui::DragInt("##Entity Tilemap texture_width", &state->entities[state->selected_entity].tilemap.texture_width);
+                ImGui::DragInt("##Entity Tilemap texture_width", &game_scene->entities[game_scene->selected_entity].tilemap.texture_width);
                 ImGui::SameLine();
-                ImGui::DragInt("##Entity Tilemap texture_height", &state->entities[state->selected_entity].tilemap.texture_height);
+                ImGui::DragInt("##Entity Tilemap texture_height", &game_scene->entities[game_scene->selected_entity].tilemap.texture_height);
                 ImGui::PopItemWidth();
 
-                // int cellW = state->entities[state->selected_entity].tilemap.cell_width;
-                // int cellH = state->entities[state->selected_entity].tilemap.cell_height;
-                // int texW = state->entities[state->selected_entity].tilemap.texture_width;
-                // int texH = state->entities[state->selected_entity].tilemap.texture_height;
-
-                // int tilesX = texW / cellW;
-                // int tilesY = texH / cellH;
-                // int tileCount = tilesX * tilesY;
-
-                // float uvW = (float)cellW / texW;
-                // float uvH = (float)cellH / texH;
-
+                ImGui::Checkbox("Show Grid", &editor.draw_grid);
 
 
                 float cell_size = previewSize + padding;
@@ -404,42 +569,34 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                 if (ImGui::CollapsingHeader("Tilemap Available Tiles"))
                 {
                     ImGui::Columns(column_count, 0, false);
-
-                    // for (int i = 0; i < tileCount; i++)
-                    // {
-                    //     int x = i % tilesX;
-                    //     int y = i / tilesX;
-
-                    //     float u0 = x * uvW;
-                    //     float v0 = y * uvH;
-                    //     float u1 = u0 + uvW;
-                    //     float v1 = v0 + uvH;
-
-                    //     ImGui::PushID(i);
-                    //     if (ImGui::ImageButton("tile_btn", state->entities[state->selected_entity].tilemap.sprite.texture->ID,
-                    //         ImVec2(previewSize, previewSize), ImVec2(u0, v0), ImVec2(u1, v1)))
-                    //     {
-                    //         state->selected_tile = i;
-                    //     }
-                    //     ImGui::PopID();
-                    //     ImGui::NextColumn();
-                    // }
-                    for (int i = 0; i < state->entities[state->selected_entity].tilemap.tiles.size(); i++)
+                    for (int i = 0; i < game_scene->entities[game_scene->selected_entity].tilemap.tiles.size(); i++)
                     {
-                        // int x = i % tilesX;
-                        // int y = i / tilesX;
+                        float u0 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[i].u0;
+                        float v0 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[i].v0;
+                        float u1 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[i].u1;
+                        float v1 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[i].v1;
 
-                        float u0 = state->entities[state->selected_entity].tilemap.tiles[i].u0;
-                        float v0 = state->entities[state->selected_entity].tilemap.tiles[i].v0;
-                        float u1 = state->entities[state->selected_entity].tilemap.tiles[i].u1;
-                        float v1 = state->entities[state->selected_entity].tilemap.tiles[i].v1;
-
-                        ImGui::PushID(state->entities[state->selected_entity].tilemap.map[i].id + 7000);
-                        if (ImGui::ImageButton("tile_btn", state->entities[state->selected_entity].tilemap.sprite.texture->ID,
-                            ImVec2(previewSize, previewSize), ImVec2(u0, v0), ImVec2(u1, v1)))
+                        ImGui::PushID(game_scene->entities[game_scene->selected_entity].tilemap.tiles[i].id + 7000);
+                        if (i == editor.selected_tile)
                         {
-                            state->selected_tile = i;
+                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 1, 1, 1));
                         }
+                        else
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                        }
+                        if (game_scene->entities[game_scene->selected_entity].sprite.texture)
+                        {
+                            if (ImGui::ImageButton("tile_btn", game_scene->entities[game_scene->selected_entity].sprite.texture->ID,
+                                ImVec2(previewSize, previewSize), ImVec2(u0, v0), ImVec2(u1, v1)))
+                            {
+                                editor.selected_tile = i;
+                            }
+                        }
+                        else {
+                            ImGui::Text("Button: No tilemap texture loaded");
+                        }
+                        ImGui::PopStyleColor();
                         ImGui::PopID();
                         ImGui::NextColumn();
 
@@ -455,18 +612,31 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                 if (ImGui::CollapsingHeader("Tilemap Used Tiles"))
                 {
                     ImGui::Columns(column_count, 0, false);
-                    for (int i = 0; i < state->entities[state->selected_entity].tilemap.map.size(); i++)
+                    int tile_count = 0;
+                    for (auto& pair : game_scene->entities[game_scene->selected_entity].tilemap.map)
                     {
-                        float u0 = state->entities[state->selected_entity].tilemap.map[i].u0;
-                        float v0 = state->entities[state->selected_entity].tilemap.map[i].v0;
-                        float u1 = state->entities[state->selected_entity].tilemap.map[i].u1;
-                        float v1 = state->entities[state->selected_entity].tilemap.map[i].v1;
+                        Tile &tile = pair.second;
 
-                        ImGui::PushID(state->entities[state->selected_entity].tilemap.map[i].id);
-                        if (ImGui::ImageButton("tile_btn", state->entities[state->selected_entity].tilemap.sprite.texture->ID,
-                            ImVec2(previewSize, previewSize), ImVec2(u0, v0), ImVec2(u1, v1)))
+                        float u0 = tile.u0;
+                        float v0 = tile.v0;
+                        float u1 = tile.u1;
+                        float v1 = tile.v1;
+
+                        ImGui::PushID(tile.id);
+                        if (game_scene->entities[game_scene->selected_entity].sprite.texture)
                         {
-                            state->selected_tile = i;
+                            if (ImGui::ImageButton("tile_btn", game_scene->entities[game_scene->selected_entity].sprite.texture->ID,
+                                ImVec2(previewSize, previewSize), ImVec2(u0, v0), ImVec2(u1, v1)))
+                            {
+                                editor.selected_tile = tile_count;
+                            }
+                        }
+                        else {
+                            ImGui::Text("No tilemap texture loaded");
+                        }
+                        if (ImGui::IsItemHovered())
+                        {
+                            ImGui::SetTooltip("Index: %d", tile_count);
                         }
                         ImGui::PopID();
                         ImGui::NextColumn();
@@ -478,12 +648,12 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         }
 
         // ============ ENTITY SPRITE ============
-        if (state->entities[state->selected_entity].flags & ENTITY_SPRITE)
+        if (game_scene->entities[game_scene->selected_entity].flags & ENTITY_SPRITE)
         {
             if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen))
             {
 
-                ImVec4 color = Vec4ToImVec4(state->entities[state->selected_entity].sprite.color);
+                ImVec4 color = Vec4ToImVec4(game_scene->entities[game_scene->selected_entity].sprite.color);
 
                 ImGuiColorEditFlags base_flags = ImGuiColorEditFlags_None;
                 static bool saved_palette_init = true;
@@ -522,7 +692,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                     ImGui::Separator();
                     if (ImGui::ColorPicker4("##picker", (float*)&color, base_flags | ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar))
                     {
-                        state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
+                        game_scene->entities[game_scene->selected_entity].sprite.color = ImVec4ToVec4(color);
                     }
                     ImGui::SameLine();
 
@@ -547,7 +717,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                             // entity_color = ImVec4ToVec4(ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w))
                             color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
-                            state->entities[state->selected_entity].sprite.color = ImVec4ToVec4(color);
+                            game_scene->entities[game_scene->selected_entity].sprite.color = ImVec4ToVec4(color);
                         }
 
                         // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
@@ -576,9 +746,10 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                 if (editor.sprite_temp != nullptr)
                 {
                     ImGui::Image(editor.sprite_temp->ID, ImVec2(100, 100));
+                }
                     if (ImGui::IsItemHovered())
                     {
-                        // ImGui::SetTooltip(state->entities[state->selected_entity].sprite.texture->path);
+                        // ImGui::SetTooltip(game_scene->entities[game_scene->selected_entity].sprite.texture->path);
                     }
                     if (ImGui::BeginDragDropTarget())
                     {
@@ -586,18 +757,18 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                         {
                             const char *payload_data = static_cast<const char*>(payload->Data);
                             std::string path = payload_data;
-                            printf("path? : %s\n", path.c_str());
                             LoadTexture(editor.sprite_temp, path.c_str());
-                            state->entities[state->selected_entity].sprite.texture = editor.sprite_temp;
+                            game_scene->entities[game_scene->selected_entity].sprite.filename = path;
+                            game_scene->entities[game_scene->selected_entity].sprite.texture = editor.sprite_temp;
                         }
 
                         ImGui::EndDragDropTarget();
                     }
-                }
+                // }
 
                 ImGui::Text("Z-Index");
                 ImGui::PushItemWidth(w_width);
-                ImGui::DragInt("##Entity z-index", &state->entities[state->selected_entity].sprite.z_index);
+                ImGui::DragInt("##Entity z-index", &game_scene->entities[game_scene->selected_entity].sprite.z_index);
                 // ImGui::PopItemWidth();
                 ImGui::SameLine();
                 ImGui::PushID("ResetSpriteZIndex");
@@ -608,8 +779,8 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
                 ImGui::PopItemWidth();
                 ImGui::PopID();
 
-                ImGui::Checkbox("Flip Horizontal", &state->entities[state->selected_entity].sprite.flip_x);
-                ImGui::Checkbox("Flip Vertical", &state->entities[state->selected_entity].sprite.flip_y);
+                ImGui::Checkbox("Flip Horizontal", &game_scene->entities[game_scene->selected_entity].sprite.flip_x);
+                ImGui::Checkbox("Flip Vertical", &game_scene->entities[game_scene->selected_entity].sprite.flip_y);
             }
         }
 
@@ -620,7 +791,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         ImGui::AlignTextToFramePadding();
 
         bool enable_animated_sprite = true;
-        if (state->entities[state->selected_entity].flags & ENTITY_ANIMATED_SPRITE)
+        if (game_scene->entities[game_scene->selected_entity].flags & ENTITY_ANIMATED_SPRITE)
         {
             bool as_open = ImGui::CollapsingHeader("##Animated Sprite", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
             ImGui::SameLine();
@@ -630,14 +801,14 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
             if (as_open)
             {
                 ImVec2 available_size = ImGui::GetContentRegionAvail();
-                ImGui::Text("Current Frame: %d", state->entities[state->selected_entity].animated_sprite.frame_index);
+                ImGui::Text("Current Frame: %d", game_scene->entities[game_scene->selected_entity].animated_sprite.frame_index);
                     //ImGui::SameLine();
                     //ImGui::PushItemWidth(available_size.x);
-                    //ImGui::DragInt("##Entity FrameIndex", &state->entities[state->selected_entity].animated_sprite.frame_index, 1.0f, 0.0f, state->entities[state->selected_entity].animated_sprite.max_frames - 1);
+                    //ImGui::DragInt("##Entity FrameIndex", &game_scene->entities[game_scene->selected_entity].animated_sprite.frame_index, 1.0f, 0.0f, game_scene->entities[game_scene->selected_entity].animated_sprite.max_frames - 1);
 
                     ImGui::Text("Frame Duration");
                     ImGui::PushItemWidth(available_size.x / 2.5f);
-                    ImGui::DragFloat("##Entity Frame Duration", &state->entities[state->selected_entity].animated_sprite.frame_duration, 0.01f, 0.0f, 1.0f, "%.02f");
+                    ImGui::DragFloat("##Entity Frame Duration", &game_scene->entities[game_scene->selected_entity].animated_sprite.frame_duration, 0.01f, 0.0f, 1.0f, "%.02f");
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 2.5f);
@@ -651,7 +822,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                     ImGui::Text("Frame Range");
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##Entity Start Frame", &state->entities[state->selected_entity].animated_sprite.start_frame, 1, 0, state->entities[state->selected_entity].animated_sprite.max_frames);
+                    ImGui::DragInt("##Entity Start Frame", &game_scene->entities[game_scene->selected_entity].animated_sprite.start_frame, 1, 0, game_scene->entities[game_scene->selected_entity].animated_sprite.max_frames);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
@@ -665,7 +836,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##Entity End Frame", &state->entities[state->selected_entity].animated_sprite.end_frame, 1, 0, state->entities[state->selected_entity].animated_sprite.max_frames);
+                    ImGui::DragInt("##Entity End Frame", &game_scene->entities[game_scene->selected_entity].animated_sprite.end_frame, 1, 0, game_scene->entities[game_scene->selected_entity].animated_sprite.max_frames);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
@@ -679,11 +850,11 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                     ImGui::Text("Cell Size");
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##EntityCellSizeX", &state->entities[state->selected_entity].animated_sprite.cell_width, 1, 0, 0,"X: %d");
+                    ImGui::DragInt("##EntityCellSizeX", &game_scene->entities[game_scene->selected_entity].animated_sprite.cell_width, 1, 0, 0,"X: %d");
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##EntityCellSizeY", &state->entities[state->selected_entity].animated_sprite.cell_height, 1, 0, 0, "Y: %d");
+                    ImGui::DragInt("##EntityCellSizeY", &game_scene->entities[game_scene->selected_entity].animated_sprite.cell_height, 1, 0, 0, "Y: %d");
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
@@ -697,11 +868,11 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
                     ImGui::Text("Texture Size");
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##EntityTextureSizeX", &state->entities[state->selected_entity].animated_sprite.texture_width, 1, 0, 0,"W: %d");
+                    ImGui::DragInt("##EntityTextureSizeX", &game_scene->entities[game_scene->selected_entity].animated_sprite.texture_width, 1, 0, 0,"W: %d");
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
-                    ImGui::DragInt("##EntityTextureSizeY", &state->entities[state->selected_entity].animated_sprite.texture_height, 1, 0, 0, "H: %d");
+                    ImGui::DragInt("##EntityTextureSizeY", &game_scene->entities[game_scene->selected_entity].animated_sprite.texture_height, 1, 0, 0, "H: %d");
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::PushItemWidth(available_size.x / 3.5f);
@@ -782,10 +953,94 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     snprintf(buffer, IM_ARRAYSIZE(buffer), "FPS: %d", fps);
     draw_list->AddText(textPos, IM_COL32(255, 255, 0, 255), buffer);
 
-    char mouse_buffer[255];
-    snprintf(mouse_buffer, IM_ARRAYSIZE(mouse_buffer), "%lf, %lf", Input->mx, Input->my);
-    ImVec2 mtextPos = ImVec2(imageMin.x + 20, imageMin.y + 40);
-    draw_list->AddText(mtextPos, IM_COL32(255, 255, 0, 255), mouse_buffer);
+    if (editor.selected_tile >= 0)
+    {
+        if (ImGui::IsWindowFocused() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            Vector2 mouse = { (float)Input->mx, (float)Input->my};
+
+            ImVec2 imageMin = ImGui::GetItemRectMin();
+            ImVec2 imageMax = ImGui::GetItemRectMax();
+            float displayW = imageMax.x - imageMin.x;
+            float displayH = imageMax.y - imageMin.y;
+
+            // if (mouse.x < imageMin.x || mouse.x > imageMax.x || mouse.y < imageMin.y || mouse.y > imageMax.y) {
+            //     // outside the scene image — ignore
+            //     return;
+            // }
+            float localX = mouse.x - imageMin.x;
+            float localY = mouse.y - imageMin.y;
+
+            float fboW = 1280;
+            float fboH = 720;
+
+            float fbMouseX = (localX / displayW) * fboW;
+            float fbMouseY = (localY / displayH) * fboH;
+
+            Vector2 fbMouse = { fbMouseX, fbMouseY };
+            Vector2 worldPos = ScreenToWorld(fbMouse, context->projection, (int)fboW, (int)fboH);
+
+            Vector2 tilemapPos = game_scene->entities[game_scene->selected_entity].transform.position;
+
+            float cw = game_scene->entities[game_scene->selected_entity].tilemap.cell_width;
+            float ch = game_scene->entities[game_scene->selected_entity].tilemap.cell_height;
+
+            int col = (int)floor((worldPos.x - tilemapPos.x) / cw);
+            int row = (int)floor((worldPos.y - tilemapPos.y) / ch);
+
+            GridCoord key { col, row };
+
+            Tile tiled;
+            tiled.id = state->nextID++;
+            Vector2 pos = {tilemapPos.x + col * cw, tilemapPos.y + row * ch};
+            tiled.transform.position = pos;
+            float size = game_scene->entities[game_scene->selected_entity].tilemap.cell_width;
+            tiled.transform.size = {cw, ch};
+            tiled.transform.scale = {1, 1};
+            tiled.u0 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[editor.selected_tile].u0;
+            tiled.v0 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[editor.selected_tile].v0;
+            tiled.u1 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[editor.selected_tile].u1;
+            tiled.v1 = game_scene->entities[game_scene->selected_entity].tilemap.tiles[editor.selected_tile].v1;
+            game_scene->entities[game_scene->selected_entity].tilemap.map[key] = tiled;
+        }
+
+        if (ImGui::IsWindowFocused() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+        {
+            Vector2 mouse = { (float)Input->mx, (float)Input->my};
+
+            ImVec2 imageMin = ImGui::GetItemRectMin();
+            ImVec2 imageMax = ImGui::GetItemRectMax();
+            float displayW = imageMax.x - imageMin.x;
+            float displayH = imageMax.y - imageMin.y;
+
+            // if (mouse.x < imageMin.x || mouse.x > imageMax.x || mouse.y < imageMin.y || mouse.y > imageMax.y) {
+            //     // outside the scene image — ignore
+            //     return;
+            // }
+            float localX = mouse.x - imageMin.x;
+            float localY = mouse.y - imageMin.y;
+
+            float fboW = 1280;
+            float fboH = 720;
+
+            float fbMouseX = (localX / displayW) * fboW;
+            float fbMouseY = (localY / displayH) * fboH;
+
+            Vector2 fbMouse = { fbMouseX, fbMouseY };
+            Vector2 worldPos = ScreenToWorld(fbMouse, context->projection, (int)fboW, (int)fboH);
+
+            Vector2 tilemapPos = game_scene->entities[game_scene->selected_entity].transform.position;
+
+            float cw = game_scene->entities[game_scene->selected_entity].tilemap.cell_width;
+            float ch = game_scene->entities[game_scene->selected_entity].tilemap.cell_height;
+
+            int col = (int)floor((worldPos.x - tilemapPos.x) / cw);
+            int row = (int)floor((worldPos.y - tilemapPos.y) / ch);
+
+            GridCoord key { col, row };
+            game_scene->entities[game_scene->selected_entity].tilemap.map.erase(key);
+        }
+    }
 
     ImGui::End();
 
@@ -801,7 +1056,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     if (ImGui::Button("<-"))
     {
         content_browser.current_directory = content_browser.current_directory.parent_path();
-        content_browser.current_filename = "assets";
+        content_browser.current_filename = content_browser.current_directory.string();
         build_assets(content_browser.current_directory);
     }
     if (!disabled)
@@ -869,8 +1124,15 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
             if (content_browser.files[i].isDirectory)
             {
                 content_browser.current_directory /= content_browser.files[i].path.filename();
-                content_browser.current_filename = content_browser.files[i].path.filename();
+                content_browser.current_filename = content_browser.files[i].filename;
                 build_assets(content_browser.current_directory);
+            } else if (content_browser.files[i].path.extension() == ".bin")
+            {
+                size_t lastindex = content_browser.files[i].filename.find_last_of(".");
+                std::string rawname = content_browser.files[i].filename.substr(0, lastindex);
+                load_scene(state, rawname.c_str());
+                context->camera->position.x = 0;
+                context->camera->position.y = 0;
             }
         }
 
@@ -899,6 +1161,78 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     ImGui::EndChild();
     ImGui::End();
 
+    ImGui::Begin("Console", nullptr);
+    {
+        static bool auto_scroll = true;
+        static char filter_buffer[256] = "";
+        
+        ImGui::Checkbox("Auto Scroll", &auto_scroll);
+        ImGui::SameLine();
+        ImGui::InputText("Filter", filter_buffer, IM_ARRAYSIZE(filter_buffer));
+        ImGui::Separator();
+    
+        ImGuiStyle &style = ImGui::GetStyle();
+        ImGui::BeginChild("ScrollingRegion", ImVec2(0, -5), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        
+            // Track how many messages are actually shown (after filter)
+            static int prev_displayed_count = 0;
+            int displayed_count = 0;
+        
+            for (const auto& msg : game_logs.messages)
+            {
+                if (strlen(filter_buffer) == 0 || strstr(msg.c_str(), filter_buffer) != nullptr)
+                {
+                    ImGui::TextUnformatted(msg.c_str());
+                    ++displayed_count;
+                }
+            }
+        
+            bool user_at_bottom = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f);
+        
+            if (auto_scroll && (user_at_bottom || displayed_count > prev_displayed_count))
+            {
+                ImGui::SetScrollHereY(1.0f);
+            }
+        
+            prev_displayed_count = displayed_count;
+        
+            ImGui::PopStyleVar();
+        }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    // Set position to bottom-left, with a small offset for padding
+    ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y - ImGui::GetFrameHeightWithSpacing()), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, ImGui::GetFrameHeightWithSpacing()), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+    if (ImGui::Begin("##StatusBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus))
+    {
+        char buffer[256];
+        snprintf(buffer, IM_ARRAYSIZE(buffer), "FPS: %d", fps);
+        ImGui::Text(" ");
+        ImGui::SameLine();
+
+        float textWidth = ImGui::CalcTextSize(buffer).x;
+        float availableWidth = ImGui::GetContentRegionAvail().x;
+        float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
+
+        float posX = ImGui::GetCursorPosX() + availableWidth - textWidth - itemSpacing;
+
+        if (posX > ImGui::GetCursorPosX())
+        {
+            ImGui::SetCursorPosX(posX);
+        }
+        ImGui::Text(buffer);
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(2);
+
     if (editor.firstTime)
     {
         editor.firstTime = false;
@@ -906,16 +1240,94 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
         ImGui::DockBuilderAddNode(dockspace_id, dockspace_flags | ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
 
+        // ImGuiID top_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.5f, nullptr, &dockspace_id);
         ImGuiID right_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.25f, nullptr, &dockspace_id);
         ImGuiID left_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.20f, nullptr, &dockspace_id);
         ImGuiID bottom_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.35f, nullptr, &dockspace_id);
+        ImGuiID console_right_node_id = ImGui::DockBuilderSplitNode(bottom_node_id, ImGuiDir_Right, 0.50f, nullptr, &bottom_node_id);
         ImGuiID scene_dock_id = ImGui::GetWindowDockID();
         ImGuiID scene_dock_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.25f, nullptr, &scene_dock_left);
+        // ImGui::DockBuilderDockWindow("MenuBar", top_node_id);
         ImGui::DockBuilderDockWindow("Scene Hierarchy", scene_dock_left);
         ImGui::DockBuilderDockWindow("Inspector", right_node_id);
         ImGui::DockBuilderDockWindow("Content Browser", bottom_node_id);
+        ImGui::DockBuilderDockWindow("Console", console_right_node_id);
         ImGui::DockBuilderDockWindow("Scene", dockspace_id);
         ImGui::DockBuilderFinish(dockspace_id);
+    }
+    ImGui::End();
+
+    // POPUP
+
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    
+    if (editor.save_modal_popup)
+    {
+        ImGui::OpenPopup("SaveScene");
+        editor.save_modal_popup = false;
+    }
+    if (ImGui::BeginPopupModal("SaveScene", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Save?");
+        ImGui::Separator();
+
+        
+        ImGui::InputText("Filename", &editor.save_name_buffer);
+
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+            printf("%s\n", editor.save_name_buffer.c_str());
+            if (!editor.save_name_buffer.empty())
+            {
+                export_scene(state, editor.save_name_buffer.c_str());
+                build_assets(content_browser.current_directory);
+            }
+            editor.save_name_buffer = "";
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (editor.load_modal_popup)
+    {
+        ImGui::OpenPopup("LoadScene");
+        editor.load_modal_popup = false;
+    }
+    if (ImGui::BeginPopupModal("LoadScene", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Load?");
+        ImGui::Separator();
+
+        
+        ImGui::InputText("Filename", &editor.save_name_buffer);
+
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+            printf("%s\n", editor.save_name_buffer.c_str());
+            if (!editor.save_name_buffer.empty())
+            {
+                if (load_scene(state, editor.save_name_buffer.c_str()))
+                {
+                    context->camera->position.x = 0;
+                    context->camera->position.y = 0;
+                    printf("Scene loaded");
+                } else {
+                    printf("Failed to laod scene: %s", editor.save_name_buffer.c_str());
+                }
+            }
+            editor.save_name_buffer = "";
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 
     ImGui::Render();

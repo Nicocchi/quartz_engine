@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +23,11 @@ typedef struct game_memory
     uint64_t renderSize;
     bool isInit;
 } game_memory;
+
+struct game_logs
+{
+    std::vector<std::string> messages;
+} game_logs;
 
 #define MAX_KEYS    1024
 #define MAX_BUTTONS 32
