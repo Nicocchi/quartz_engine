@@ -48,12 +48,13 @@ UWhite='\033[4;37m'       # White
 
 TRACK_HEADERS=1
 FORCE_REBUILD=0
+COPY_ASSETS=0
 
 for arg in "$@"; do
     case "$arg" in
         --no-headers)  TRACK_HEADERS=0 ;;
         --full)        FORCE_REBUILD=1 ;;
-        *)             echo "Unknown option: $arg"; echo "Usage: $0 [--no-headers] [--full]"; exit 1 ;;
+        *)             echo "Unknown option: $arg"; echo "Usage: $0 [--no-headers] [--full] [--copy-assets]"; exit 1 ;;
     esac
 done
 
@@ -63,6 +64,7 @@ else
     printf "${Yellow}  Header tracking: ${UBlue}OFF${NC}\n"
 fi
 if [[ $FORCE_REBUILD -eq 1 ]]; then
+    COPY_ASSETS=1
     printf "${Yellow}  Mode: ${UBlue}full rebuild${NC}\n"
 else
     printf "${Yellow}  Mode: ${UBlue}incremental${NC}\n"
@@ -280,10 +282,15 @@ print_elapsed $t "Game"
 # ASSETS                               #
 ########################################
 printf "${Yellow}======= Assets =======${NC}\n"
-cp -n engine/lib/glfw3.dll $build_dir
-cp -n engine/lib/freetype.dll $build_dir
+if [[ $COPY_ASSETS -eq 1 ]]; then
+    cp -n engine/lib/glfw3.dll $build_dir
+    cp -n engine/lib/freetype.dll $build_dir
 
-printf "Copying assets...\n"
-cp -r assets $build_dir
+    printf "  Copying assets...\n"
+    cp -r assets $build_dir
+else
+    printf "${Green}  Asset copy not enabled ${NC}\n"
+fi
+
 
 printf "${Yellow}======= Done =======${NC}\n"
