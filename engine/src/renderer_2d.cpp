@@ -1,14 +1,14 @@
+#include "renderer_2d.hpp"
+#include "platform.hpp"
+#include <fstream>
+
+#include "game.hpp"
+#include "../vendor/glad/glad.h"
+
 void init_renderer(render_context *context, const float width, const float height)
 {
 
     context->shader = compile_shader("assets/shaders/basic.vs", "assets/shaders/basic.frag");
-
-    // GLfloat vertices[] = {
-    //     -1.0f, -1.0f, 0.0f,  // Bottom-Left
-    //     -1.0f,  1.0f, 0.0f,  // Top-Left
-    //     1.0f,  1.0f, 0.0f,  // Top-Right
-    //     1.0f, -1.0f, 0.0f   // Bottom-Right
-    // };
 
     GLfloat vertices[] = {
         0.0f, 0.0f, 0.0f, // Bottom-left
@@ -48,14 +48,11 @@ void init_renderer(render_context *context, const float width, const float heigh
 
     // Vertex positions
     glBindBuffer(GL_ARRAY_BUFFER, context->VBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(pos_index, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)0);
     glEnableVertexAttribArray(0);
 
 
     // UVs
-    // glBindBuffer(GL_ARRAY_BUFFER, context->UVO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(uv_data), uv_data, GL_STATIC_DRAW);
     glVertexAttribPointer(uv_index, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)8);
     glEnableVertexAttribArray(1);
 
@@ -132,7 +129,6 @@ void draw_scene(render_context *context)
 
                 glBindVertexArray(context->VAO);
                 glBindTexture(GL_TEXTURE_2D, textureToBind);
-                // glBindTexture(GL_TEXTURE_2D, context->defaultWhiteTexture);
 
                 glDrawElementsBaseVertex(GL_TRIANGLES, command.count, GL_UNSIGNED_INT, 0, command.offset);
                 glBindVertexArray(0);
@@ -143,8 +139,6 @@ void draw_scene(render_context *context)
             case DRAW_LINE:
             {
                 glUseProgram(context->shader.ID);
-                // glUniformMatrix4fv(projectionUniformLocation, 1, GL_FALSE, &viewProjection.m0);
-                // glUniform4f(colorUniformLocation, color.x, color.y, color.z, color.w);
 
                 float vertices[] = {
                     command.line_pos_a.x, command.line_pos_a.y, 0.0f,
@@ -219,6 +213,245 @@ void draw_scene(render_context *context)
                 glDeleteBuffers(1, &vbo);
             } break;
 
+        }
+    }
+}
+
+bool compareEntities(const Entity *a, const Entity *b)
+{
+    int az = a->tilemap.enabled ? a->sprite.z_index : a->sprite.z_index;
+    int bz = b->tilemap.enabled ? b->sprite.z_index : b->sprite.z_index;
+    return az < bz;
+}
+
+std::vector<Entity*> entities;
+void render_entities(game_memory *GM, float deltaTime)
+{
+    game_state *state = (game_state*)GM->storage;
+    render_context *render_state = (render_context*)GM->renderStorage;
+
+    entities.clear();
+    if (state->scenes.size() <= 0)
+    {
+        return;
+    }
+    for (int i = 0; i < state->scenes[state->current_scene].entities.size(); i++)
+    {
+        entities.push_back(&state->scenes[state->current_scene].entities[i]);
+    }
+    std::sort(entities.begin(), entities.end(), compareEntities);
+
+    for (int i = 0; i < entities.size(); i++)
+    {
+        if (!entities[i]->tilemap.enabled)
+        {
+            entities[i]->dirty = false;
+
+            render_command draw_texture;
+            draw_texture.type = DRAW_TEXTURE;
+            draw_texture.texture = entities[i]->sprite.texture;
+
+            Vector2 pos = entities[i]->transform.position;
+            Vector2 esize = entities[i]->transform.size * entities[i]->transform.scale;
+            float rotation = entities[i]->transform.rotation;
+
+            vertex *v = &render_state->vertices[render_state->vertexCount];
+
+            // Sprite animation
+            float tw = float(entities[i]->animated_sprite.cell_width) / entities[i]->animated_sprite.texture_width;
+            float th = float(entities[i]->animated_sprite.cell_height) / entities[i]->animated_sprite.texture_height;
+            int width = entities[i]->animated_sprite.cell_width;
+            int twidth = entities[i]->animated_sprite.texture_width;
+            int numPerRow = twidth / width;
+
+            entities[i]->animated_sprite.current_duration += deltaTime;
+
+            if (entities[i]->animated_sprite.current_duration >= entities[i]->animated_sprite.frame_duration)
+            {
+                entities[i]->animated_sprite.current_duration = 0.0f;
+
+
+                entities[i]->animated_sprite.frame_index++;
+
+                if (entities[i]->animated_sprite.frame_index > entities[i]->animated_sprite.end_frame)
+                {
+                    entities[i]->animated_sprite.frame_index = entities[i]->animated_sprite.start_frame;
+                }
+            }
+
+            int frame = entities[i]->animated_sprite.frame_index;
+
+            float tx = (frame % numPerRow) * tw;
+            float ty = 1.0f - ((frame / numPerRow) + 1) * th;
+
+            tx += entities[i]->animated_sprite.offset_x;
+            ty += entities[i]->animated_sprite.offset_y;
+
+            float u0 = tx;
+            float u1 = tx + tw;
+            float v0 = ty;
+            float v1 = ty + th;
+
+            if (entities[i]->sprite.flip_x)
+            {
+                std::swap(u0, u1);
+            }
+
+            if (entities[i]->sprite.flip_y)
+            {
+                std::swap(v0, v1);
+            }
+
+            v[0].position = pos;
+            // Top-left
+            v[0].texCoords = {u0, v1};
+            v[0].color.x = entities[i]->sprite.color.x;
+            v[0].color.y = entities[i]->sprite.color.y;
+            v[0].color.z = entities[i]->sprite.color.z;
+            v[0].color.w = entities[i]->sprite.color.w;
+
+            v[1].position = {pos.x + esize.x, pos.y};
+            // Top-right
+            v[1].texCoords = {u1, v1};
+            v[1].color.x = entities[i]->sprite.color.x;
+            v[1].color.y = entities[i]->sprite.color.y;
+            v[1].color.z = entities[i]->sprite.color.z;
+            v[1].color.w = entities[i]->sprite.color.w;
+
+            v[2].position = {pos.x + esize.x, pos.y + esize.y};
+            // Bottom-right
+            v[2].texCoords = {u1, v0};
+            v[2].color.x = entities[i]->sprite.color.x;
+            v[2].color.y = entities[i]->sprite.color.y;
+            v[2].color.z = entities[i]->sprite.color.z;
+            v[2].color.w = entities[i]->sprite.color.w;
+
+            v[3].position = {pos.x, pos.y + esize.y};
+            // Bottom-left
+            v[3].texCoords = {u0, v0};
+            v[3].color.x = entities[i]->sprite.color.x;
+            v[3].color.y = entities[i]->sprite.color.y;
+            v[3].color.z = entities[i]->sprite.color.z;
+            v[3].color.w = entities[i]->sprite.color.w;
+
+
+            if (rotation != 0)
+            {
+                float c = cos(rotation);
+                float s = sin(rotation);
+
+                Vector2 center = pos + esize / 2;
+
+                for (int j = 0; j < 4; j++)
+                {
+                    Vector2 p = v[j].position;
+
+                    // Offset from center
+                    float offset_x = p.x - center.x;
+                    float offset_y = p.y - center.y;
+
+                    // Rotate
+                    float rx = offset_x * c - offset_y * s;
+                    float ry = offset_x * s + offset_y * c;
+
+                    // Reposition back around center
+                    v[j].position.x = center.x + rx;
+                    v[j].position.y = center.y + ry;
+                }
+            }
+
+            unsigned int *ind = &render_state->indices[render_state->indexCount];
+            ind[0] = 0 + render_state->vertexCount;
+            ind[1] = 1 + render_state->vertexCount;
+            ind[2] = 2 + render_state->vertexCount;
+            ind[3] = 0 + render_state->vertexCount;
+            ind[4] = 2 + render_state->vertexCount;
+            ind[5] = 3 + render_state->vertexCount;
+
+            render_state->indexCount += 6;
+
+            draw_texture.offset = render_state->vertexCount;
+            render_state->vertexCount += 4;
+
+            draw_texture.count = 6;
+
+            render_state->render_commands.push(draw_texture);
+        }
+        else
+        {
+            for (auto& pair : entities[i]->tilemap.map)
+            {
+                Tile &mtile = pair.second;
+
+                render_command draw_texture;
+                draw_texture.type = DRAW_TEXTURE;
+                draw_texture.texture = entities[i]->sprite.texture;
+
+                Vector2 pos = mtile.transform.position;
+                Vector2 esize = mtile.transform.size * mtile.transform.scale;
+                float rotation = mtile.transform.rotation;
+
+                vertex *v = &render_state->vertices[render_state->vertexCount];
+
+                float u0 = mtile.u0;
+                float u1 = mtile.u1;
+                float v0 = mtile.v0;
+                float v1 = mtile.v1;
+
+                // Top-left vertex
+                v[0].position = pos;
+                v[0].texCoords = {u0, v1};
+                v[0].color = entities[i]->sprite.color;
+
+                // Top-right vertex
+                v[1].position = {pos.x + esize.x, pos.y};
+                v[1].texCoords = {u1, v1};
+                v[1].color = entities[i]->sprite.color;
+
+                // Bottom-right vertex
+                v[2].position = {pos.x + esize.x, pos.y + esize.y};
+                v[2].texCoords = {u1, v0};
+                v[2].color = entities[i]->sprite.color;
+
+                // Bottom-left vertex
+                v[3].position = {pos.x, pos.y + esize.y};
+                v[3].texCoords = {u0, v0};
+                v[3].color = entities[i]->sprite.color;
+
+                // Handle rotation if needed
+                if (rotation != 0)
+                {
+                    float c = cos(rotation);
+                    float s = sin(rotation);
+                    Vector2 center = pos + esize / 2;
+
+                    for (int j = 0; j < 4; j++)
+                    {
+                        Vector2 p = v[j].position;
+                        float offset_x = p.x - center.x;
+                        float offset_y = p.y - center.y;
+                        float rx = offset_x * c - offset_y * s;
+                        float ry = offset_x * s + offset_y * c;
+                        v[j].position.x = center.x + rx;
+                        v[j].position.y = center.y + ry;
+                    }
+                }
+
+                unsigned int *ind = &render_state->indices[render_state->indexCount];
+                ind[0] = 0 + render_state->vertexCount;
+                ind[1] = 1 + render_state->vertexCount;
+                ind[2] = 2 + render_state->vertexCount;
+                ind[3] = 0 + render_state->vertexCount;
+                ind[4] = 2 + render_state->vertexCount;
+                ind[5] = 3 + render_state->vertexCount;
+
+                render_state->indexCount += 6;
+                draw_texture.offset = render_state->vertexCount;
+                render_state->vertexCount += 4;
+                draw_texture.count = 6;
+
+                render_state->render_commands.push(draw_texture);
+            }
         }
     }
 }

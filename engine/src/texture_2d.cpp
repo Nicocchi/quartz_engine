@@ -1,3 +1,9 @@
+#include "texture_2d.hpp"
+#include "../vendor/glad/glad.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "../vendor/stb_image.h"
+
 bool LoadTexture(Texture2D *texture, const char *path, bool flip)
 {
     int w, h, nrChannels;

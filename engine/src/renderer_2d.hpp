@@ -1,6 +1,8 @@
 #pragma once
 
+#include "raymath_ext.h"
 #include <queue>
+#include "texture_2d.hpp"
 #include "entity.hpp"
 
 enum RENDER_TYPE
@@ -44,7 +46,6 @@ struct render_framebuffer
 struct render_command
 {
     RENDER_TYPE type;
-    uint32_t id;
 
     const char *filePath;
 
@@ -94,5 +95,8 @@ Matrix create_projection(float zoom, Vector2 position, float rotation, float wid
 
 void create_framebuffer(render_framebuffer *fbo, const float width, const float height);
 void bind_framebuffer(render_framebuffer *fbo, float width, float height);
+void draw_framebuffer(render_framebuffer *fbo, float width, float height);
 void unbind_framebuffer();
 void delete_framebuffer(render_framebuffer *fbo);
+void init_renderer(render_context *context, const float width, const float height);
+void render_entities(game_memory *GM, float deltaTime);

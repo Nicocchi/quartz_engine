@@ -1,7 +1,11 @@
 #pragma once
 
+#include <stdint.h>
+#include "texture_2d.hpp"
+#include "raymath_ext.h"
+#include "../vendor/uuid_v4.h"
+#include "platform.hpp"
 #include <unordered_map>
-#include <string>
 
 typedef uint32_t flag_t;
 enum
@@ -75,7 +79,6 @@ struct AnimatedSprite
 struct Tile
 {
     unsigned int id;
-    Sprite sprite;
     Transform transform;
     float u0 = 0;
     float u1 = 0;
@@ -98,6 +101,7 @@ struct Tilemap
 struct Entity
 {
     unsigned int id;
+    UUIDv4::UUID uuid;
     // const char *name;
     std::string name;
     size_t vertexOffset = 0; // index into the shared vertex buffer
@@ -119,7 +123,7 @@ struct Entity
 struct Scene
 {
     unsigned int id;
-    // const char *name;
+    UUIDv4::UUID uuid;
     std::string name;
 
     // Entity management

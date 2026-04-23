@@ -1,12 +1,12 @@
 #pragma once
-#include <string>
-#include <vector>
+
+#include "../vendor/uuid_v4.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
+static UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
 
 typedef struct arena
 {
@@ -27,7 +27,9 @@ typedef struct game_memory
 struct game_logs
 {
     std::vector<std::string> messages;
-} game_logs;
+};
+
+static game_logs game_logs;
 
 #define MAX_KEYS    1024
 #define MAX_BUTTONS 32

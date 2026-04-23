@@ -1,5 +1,11 @@
 #pragma once
 
+#include "../vendor/glad/glad.h"
+#define GL_SILENCE_DEPRECATION
+#include "../vendor/glfw/glfw3.h"
+
+#include "platform.hpp"
+#include "raymath_ext.h"
 
 struct Window
 {
@@ -17,3 +23,4 @@ void window_poll();
 void window_clear();
 void window_swap_buffers(Window *window);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void window_clear(Vector3 color);

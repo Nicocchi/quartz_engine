@@ -1,12 +1,22 @@
 #pragma once
 
+#ifdef ENGINE_COMP
+#else
 #include <cstring>
+#include <atomic>
+#include <string>
+#include <vector>
+#include <queue>
+#include <unordered_map>
+
 #include "raymath_ext.h"
+#include "../vendor/uuid_v4.h"
+
 #include "platform.hpp"
 #include "texture_2d.hpp"
-#include "renderer_2d.hpp"
 #include "entity.hpp"
-#include <atomic>
+#include "renderer_2d.hpp"
+#endif
 
 struct game_state
 {

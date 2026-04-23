@@ -1,10 +1,11 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
+#include "window.hpp"
 #include "platform.hpp"
-
-#include "windows.h"
-#include <stdio.h>
-
-#include "pch.hpp"
-#include "unity_build.hpp"
+#include "renderer_2d.hpp"
+#include "editor.hpp"
 
 
 struct game_code
@@ -169,6 +170,7 @@ int main()
         // Call game code methods
         if (gameCode.update)
         {
+            render_entities(&GameMemory, deltaTime);
             gameCode.update(&GameMemory, window->Input, deltaTime);
         }
 

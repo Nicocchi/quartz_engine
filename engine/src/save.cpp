@@ -1,3 +1,10 @@
+#include "save.hpp"
+#include "game.hpp"   // full definition only where needed
+#include <stdint.h>
+#include <string>
+#include "platform.hpp"
+#include "entity.hpp"
+
 void save_sprite(FILE *fp, const Sprite& s)
 {
     uint32_t len = (uint32_t)s.filename.size();
@@ -84,8 +91,6 @@ void save_tilemap(std::FILE *fp, const Tilemap& tm)
     std::fwrite(&tm.texture_height, sizeof(int), 1, fp);
     std::fwrite(&tm.enabled, sizeof(bool), 1, fp);
 
-    // save_sprite(fp, tm.sprite);
-
     // Save tiles vector
     size_t tileCount = tm.tiles.size();
     std::fwrite(&tileCount, sizeof(size_t), 1, fp);
@@ -93,7 +98,6 @@ void save_tilemap(std::FILE *fp, const Tilemap& tm)
 
     for (const Tile& t : tm.tiles)
     {
-        // std::fwrite(&t, sizeof(Tile), 1, fp);
         save_tile(fp, t);
     }
 
@@ -105,7 +109,6 @@ void save_tilemap(std::FILE *fp, const Tilemap& tm)
     {
         std::fwrite(&pair.first, sizeof(GridCoord), 1, fp);
         save_tile(fp, pair.second);
-        // std::fwrite(&pair.second, sizeof(Tile), 1, fp);
     }
 }
 
@@ -118,8 +121,6 @@ void load_tilemap(std::FILE *fp, Tilemap& tm)
     std::fread(&tm.texture_height, sizeof(int), 1, fp);
     std::fread(&tm.enabled, sizeof(bool), 1, fp);
 
-    // load_sprite(fp, tm.sprite);
-
     // Load tiles
     size_t tileCount;
     std::fread(&tileCount, sizeof(size_t), 1, fp);
@@ -128,7 +129,6 @@ void load_tilemap(std::FILE *fp, Tilemap& tm)
 
     for (size_t i = 0; i < tileCount; i++)
     {
-        // std::fread(&tm.tiles[i], sizeof(Tile), 1, fp);
         load_tile(fp, tm.tiles[i]);
     }
 
@@ -144,7 +144,6 @@ void load_tilemap(std::FILE *fp, Tilemap& tm)
         Tile value;
 
         std::fread(&key, sizeof(GridCoord), 1, fp);
-        // std::fread(&value, sizeof(Tile), 1, fp);
         load_tile(fp, value);
 
         tm.map[key] = value;
@@ -182,10 +181,8 @@ bool export_scene(game_state *state, const char *filename)
         std::fwrite(&e.world, sizeof(Transform), 1, fp);
         std::fwrite(&e.dirty, sizeof(bool), 1, fp);
 
-        // std::fwrite(&e.sprite, sizeof(Sprite), 1, fp);
         save_sprite(fp, e.sprite);
         std::fwrite(&e.animated_sprite, sizeof(AnimatedSprite), 1, fp);
-        // std::fwrite(&e.tilemap, sizeof(Tilemap), 1, fp);
         save_tilemap(fp, e.tilemap);
 
         std::fwrite(&e.flags, sizeof(flag_t), 1, fp);

@@ -1,4 +1,6 @@
-#include "iostream"
+#include "window.hpp"
+#include <iostream>
+
 
 void debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
         GLsizei length, const GLchar *message, const void* userParam)
@@ -146,7 +148,7 @@ bool create_window(Window *window, const char *title, int width, int height)
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         // QZ_ASSERT(false, "Could not initialize GLAD");
-        return -1;
+        return false;
     }
 
     int flags;

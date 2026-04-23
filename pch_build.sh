@@ -1,1 +1,0 @@
-clang++ -std=c++17 -c -o engine/src/pch.hpp.pch engine/src/pch.hpp

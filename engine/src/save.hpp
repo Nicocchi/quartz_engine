@@ -1,3 +1,12 @@
+#pragma once
+
+#include <cstdio>
+struct game_state;
+struct Scene;
+struct Sprite;
+struct Tile;
+struct Tilemap;
+struct Entity;
 
 void save_sprite(FILE *fp, const Sprite& s);
 void load_sprite(FILE *fp, Sprite& s);

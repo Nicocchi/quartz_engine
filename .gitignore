@@ -47,3 +47,4 @@
 build/
 _build_cache.cmd
 *.rdbg
+assets/

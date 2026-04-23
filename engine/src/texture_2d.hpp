@@ -8,7 +8,6 @@ struct Texture2D
     unsigned int width, height;
     bool isLoadedCPU;
     bool isLoadedGPU;
-    // const char *path;
     std::string path;
 };
 
