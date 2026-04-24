@@ -6,7 +6,7 @@
 #include "platform.hpp"
 #include "renderer_2d.hpp"
 #include "editor.hpp"
-
+#include "logger.hpp"
 
 struct game_code
 {
@@ -86,12 +86,14 @@ int main()
 {
 
     // Window Initialization
+    EngineLogger *engineLogger = new EngineLogger();
     Window *window = new Window();
-    if (!create_window(window, "Quartz", 1280, 720))
+    if (!create_window(window, "Quartz", 1280, 720, engineLogger))
     {
         // error
         return -1;
     }
+
 
     // GameMemory/Storage Initialization
     game_memory GameMemory;
@@ -191,7 +193,7 @@ int main()
         if (display_editor)
         {
             process_editor_input(render_state, window->Input, deltaTime);
-            show_editor(render_state, fps, window->Input, &GameMemory, window);
+            show_editor(render_state, fps, window->Input, &GameMemory, window, engineLogger);
         }
 
         window_swap_buffers(window);
@@ -206,6 +208,7 @@ int main()
 
     // delete editor;
     delete window;
+    delete engineLogger;
 
     unloadGameCode(&gameCode);
 }

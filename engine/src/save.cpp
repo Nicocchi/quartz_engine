@@ -4,16 +4,20 @@
 #include <string>
 #include "platform.hpp"
 #include "entity.hpp"
+#include "logger.hpp"
 
-void save_sprite(FILE *fp, const Sprite& s)
+void save_sprite(FILE *fp, const Sprite& s, EngineLogger *engineLogger)
 {
     uint32_t len = (uint32_t)s.filename.size();
     std::fwrite(&len, sizeof(uint32_t), 1, fp);
     std::fwrite(s.filename.data(), 1, len, fp);
 
     std::string log = "Save Sprite: " + s.filename;
-    printf(log.c_str());
-    game_logs.messages.push_back(log);
+    printf("%s\n", log.c_str());
+    EngineLog elog;
+    elog.messages.push_back(log);
+    elog.type = LogType::SYSTEM;
+    engineLogger->logs.push_back(elog);
 
     std::fwrite(&s.color, sizeof(Vector4), 1, fp);
     std::fwrite(&s.z_index, sizeof(int), 1, fp);
@@ -21,7 +25,7 @@ void save_sprite(FILE *fp, const Sprite& s)
     std::fwrite(&s.flip_y, sizeof(bool), 1, fp);
 }
 
-void load_sprite(FILE *fp, Sprite& s)
+void load_sprite(FILE *fp, Sprite& s, EngineLogger *engineLogger)
 {
     uint32_t len;
     std::fread(&len, sizeof(uint32_t), 1, fp);
@@ -30,8 +34,11 @@ void load_sprite(FILE *fp, Sprite& s)
     std::fread(s.filename.data(), 1, len, fp);
 
     std::string log = "Load Sprite: " + s.filename;
-    printf(log.c_str());
-    game_logs.messages.push_back(log);
+    printf("%s\n", log.c_str());
+    EngineLog elog;
+    elog.messages.push_back(log);
+    elog.type = LogType::SYSTEM;
+    engineLogger->logs.push_back(elog);
 
     std::fread(&s.color, sizeof(Vector4), 1, fp);
     std::fread(&s.z_index, sizeof(int), 1, fp);
@@ -43,8 +50,12 @@ void load_sprite(FILE *fp, Sprite& s)
     if (!LoadTexture(s.texture, s.filename.c_str()))
     {
         std::string log = "Loading Sprite: Failed to load texture: %s\n" + s.filename;
-        printf(log.c_str());
-        game_logs.messages.push_back(log);
+        printf("%s\n", log.c_str());
+        EngineLog elog;
+        elog.messages.push_back(log);
+        elog.severity = LogSeverity::HIGH;
+        elog.type = LogType::SYSTEM;
+        engineLogger->logs.push_back(elog);
         delete s.texture;
         s.texture = nullptr;
     }
@@ -53,8 +64,6 @@ void load_sprite(FILE *fp, Sprite& s)
 void save_tile(std::FILE *fp, const Tile& t)
 {
     std::fwrite(&t.id, sizeof(unsigned int), 1, fp);
-
-    // save_sprite(fp, t.sprite);
 
     std::fwrite(&t.transform, sizeof(Transform), 1, fp);
 
@@ -69,8 +78,6 @@ void save_tile(std::FILE *fp, const Tile& t)
 void load_tile(std::FILE *fp, Tile& t)
 {
     std::fread(&t.id, sizeof(unsigned int), 1, fp);
-
-    // load_sprite(fp, t.sprite);
 
     std::fread(&t.transform, sizeof(Transform), 1, fp);
 
@@ -150,7 +157,7 @@ void load_tilemap(std::FILE *fp, Tilemap& tm)
     }
 }
 
-bool export_scene(game_state *state, const char *filename)
+bool export_scene(game_state *state, const char *filename, EngineLogger *engineLogger)
 {
     std::string path = "./assets/";
     path += filename;
@@ -181,7 +188,7 @@ bool export_scene(game_state *state, const char *filename)
         std::fwrite(&e.world, sizeof(Transform), 1, fp);
         std::fwrite(&e.dirty, sizeof(bool), 1, fp);
 
-        save_sprite(fp, e.sprite);
+        save_sprite(fp, e.sprite, engineLogger);
         std::fwrite(&e.animated_sprite, sizeof(AnimatedSprite), 1, fp);
         save_tilemap(fp, e.tilemap);
 
@@ -193,7 +200,7 @@ bool export_scene(game_state *state, const char *filename)
     return true;
 }
 
-bool load_scene(game_state *state, const char *filename)
+bool load_scene(game_state *state, const char *filename, EngineLogger *engineLogger)
 {
     std::string path = "./assets/";
     path += filename;
@@ -201,12 +208,20 @@ bool load_scene(game_state *state, const char *filename)
     std::FILE *fp = fopen(path.c_str(), "rb");
     std::string log = "Loading Scene: " + path;
     printf(log.c_str());
-    game_logs.messages.push_back(log);
+    EngineLog elog;
+    elog.messages.push_back(log);
+    elog.type = LogType::SYSTEM;
+    engineLogger->logs.push_back(elog);
+
     if (!fp)
     {
         log = "Failed to load scene: " + path;
-        printf(log.c_str());
-        game_logs.messages.push_back(log);
+        printf("%s\n", log.c_str());
+        EngineLog elog;
+        elog.messages.push_back(log);
+        elog.severity = LogSeverity::HIGH;
+        elog.type = LogType::SYSTEM;
+        engineLogger->logs.push_back(elog);
         return false;
     }
 
@@ -230,6 +245,7 @@ bool load_scene(game_state *state, const char *filename)
         Entity& e = state->scenes[state->current_scene].entities[i];
 
         std::fread(&e.id, sizeof(unsigned int), 1, fp);
+        e.uuid = uuidGenerator.getUUID();
 
         size_t len;
         std::fread(&len, sizeof(size_t), 1, fp);
@@ -238,8 +254,11 @@ bool load_scene(game_state *state, const char *filename)
         std::fread(e.name.data(), sizeof(char), len, fp);
 
         std::string log = "Loading entity: " + e.name;
-        printf(log.c_str());
-        game_logs.messages.push_back(log);
+        printf("%s\n", log.c_str());
+        EngineLog elog;
+        elog.messages.push_back(log);
+        elog.type = LogType::SYSTEM;
+        engineLogger->logs.push_back(elog);
 
         std::fread(&e.vertexOffset, sizeof(size_t), 1, fp);
         std::fread(&e.transform, sizeof(Transform), 1, fp);
@@ -247,7 +266,7 @@ bool load_scene(game_state *state, const char *filename)
         std::fread(&e.world, sizeof(Transform), 1, fp);
         std::fread(&e.dirty, sizeof(bool), 1, fp);
 
-        load_sprite(fp, e.sprite);
+        load_sprite(fp, e.sprite, engineLogger);
         std::fread(&e.animated_sprite, sizeof(AnimatedSprite), 1, fp);
         load_tilemap(fp, e.tilemap);
 

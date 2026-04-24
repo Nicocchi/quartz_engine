@@ -24,13 +24,6 @@ typedef struct game_memory
     bool isInit;
 } game_memory;
 
-struct game_logs
-{
-    std::vector<std::string> messages;
-};
-
-static game_logs game_logs;
-
 #define MAX_KEYS    1024
 #define MAX_BUTTONS 32
 typedef struct input_state

@@ -1,6 +1,4 @@
 #include "window.hpp"
-#include <iostream>
-
 
 void debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
         GLsizei length, const GLchar *message, const void* userParam)
@@ -9,42 +7,54 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severi
     // ignore non-significant error/warning codes
     if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return; 
 
+    EngineLogger *engineLogger = static_cast<EngineLogger*>(const_cast<void*>(userParam));
+
     printf("---------------\n");
+    // std::string log = "Debug message" + static_cast<int>(id) + ": " + message;
+    std::string msg = message;
+    std::string msg_id = std::to_string(id);
+    std::string log = "Debug message (" + msg_id + "): " + msg;
     printf("Debug message (%i): %s\n", id, message);
+
+    EngineLog elog;
+    elog.type = LogType::SYSTEM;
+    elog.messages.push_back(log);
 
     switch (source)
     {
-        case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
-        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
-        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
-        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
-        case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
-        case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
+        case GL_DEBUG_SOURCE_API:             printf("Source: API"); if (engineLogger) elog.messages.push_back("Source: API"); break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   printf("Source: Window System"); if (engineLogger) elog.messages.push_back("Source: Window System"); break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: printf("Source: Shader Compiler"); if (engineLogger) elog.messages.push_back("Source: Shader Compiler"); break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     printf("Source: Third Party"); if (engineLogger) elog.messages.push_back("Source: Third Party"); break;
+        case GL_DEBUG_SOURCE_APPLICATION:     printf("Source: Application"); if (engineLogger) elog.messages.push_back("Source: Application"); break;
+        case GL_DEBUG_SOURCE_OTHER:           printf("Source: Other"); if (engineLogger) elog.messages.push_back("Source: Other"); break;
     }
     printf("\n");
 
     switch (type)
     {
-        case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break; 
-        case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
-        case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
-        case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
-        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
-        case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
-        case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
+        case GL_DEBUG_TYPE_ERROR:               printf("Type: Error"); if (engineLogger) elog.messages.push_back("Type: Error"); break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: printf("Type: Deprecated Behaviour"); if (engineLogger) elog.messages.push_back("Type: Deprecated Behaviour"); break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  printf("Type: Undefined Behaviour"); if (engineLogger) elog.messages.push_back("Type: Undefined Behaviour"); break; 
+        case GL_DEBUG_TYPE_PORTABILITY:         printf("Type: Portability"); if (engineLogger) elog.messages.push_back("Type: Portability"); break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         printf("Type: Performance"); if (engineLogger) elog.messages.push_back("Type: Performance"); break;
+        case GL_DEBUG_TYPE_MARKER:              printf("Type: Marker"); if (engineLogger) elog.messages.push_back("Type: Marker"); break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          printf("Type: Push Group"); if (engineLogger) elog.messages.push_back("Type: Push Group"); break;
+        case GL_DEBUG_TYPE_POP_GROUP:           printf("Type: Pop Group"); if (engineLogger) elog.messages.push_back("Type: Pop Group"); break;
+        case GL_DEBUG_TYPE_OTHER:               printf("Type: Other"); if (engineLogger) elog.messages.push_back("Type: Other"); break;
     }
     printf("\n");
     
     switch (severity)
     {
-        case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
-        case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
-        case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
-        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
+        case GL_DEBUG_SEVERITY_HIGH:         printf("Severity: high"); if (engineLogger) elog.messages.push_back("Severity: high"); elog.severity = LogSeverity::HIGH; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       printf("Severity: medium"); if (engineLogger) elog.messages.push_back("Severity: medium"); elog.severity = LogSeverity::MEDIUM; break;
+        case GL_DEBUG_SEVERITY_LOW:          printf("Severity: low"); if (engineLogger) elog.messages.push_back("Severity: low"); elog.severity = LogSeverity::LOW; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: printf("Severity: notification"); if (engineLogger) elog.messages.push_back("Severity: notification"); elog.severity = LogSeverity::LOW; break;
     }
     printf("\n\n");
+
+    engineLogger->logs.push_back(elog);
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -87,7 +97,7 @@ void cursor_position_callback(GLFWwindow *window, double xpos, double ypos)
     win->Input->my = ypos;
 }
 
-bool create_window(Window *window, const char *title, int width, int height)
+bool create_window(Window *window, const char *title, int width, int height, EngineLogger *engineLog)
 {
 
     window->title = title;
@@ -153,7 +163,7 @@ bool create_window(Window *window, const char *title, int width, int height)
 
     int flags;
     glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(debug_message_callback, nullptr);
+    glDebugMessageCallback(debug_message_callback, engineLog);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
     glViewport(0, 0, window->vwidth, window->vheight);

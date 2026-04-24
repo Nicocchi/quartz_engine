@@ -1018,7 +1018,7 @@ void draw_hierarchy(game_state *state, render_context *context)
     ImGui::End();
 }
 
-void draw_browser(game_state *state, render_context *context, int fps)
+void draw_browser(game_state *state, render_context *context, int fps, EngineLogger *engineLogger)
 {
     ImGui::Begin("Content Browser");
     ImGui::BeginChild("##cb_topbar", ImVec2(0, 34), false);
@@ -1105,7 +1105,7 @@ void draw_browser(game_state *state, render_context *context, int fps)
             {
                 size_t lastindex = content_browser.files[i].filename.find_last_of(".");
                 std::string rawname = content_browser.files[i].filename.substr(0, lastindex);
-                load_scene(state, rawname.c_str());
+                load_scene(state, rawname.c_str(), engineLogger);
                 context->camera->position.x = 0;
                 context->camera->position.y = 0;
             }
@@ -1137,7 +1137,7 @@ void draw_browser(game_state *state, render_context *context, int fps)
     ImGui::End();
 }
 
-void draw_console()
+void draw_console(EngineLogger *engineLogger)
 {
     ImGui::Begin("Console", nullptr);
     {
@@ -1154,12 +1154,34 @@ void draw_console()
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
         
             // Track how many messages are actually shown (after filter)
-            for (const auto& msg : game_logs.messages)
+            for (const auto& log : engineLogger->logs)
             {
-                if (strlen(filter_buffer) == 0 || strstr(msg.c_str(), filter_buffer) != nullptr)
+                for (const auto& msg : log.messages)
                 {
-                    ImGui::TextUnformatted(msg.c_str());
-                    ++editor.displayed_count;
+                    if (strlen(filter_buffer) == 0 || strstr(msg.c_str(), filter_buffer) != nullptr)
+                    {
+                        std::string formatted_message;
+                        if (log.type == LogType::INFO)
+                        {
+                            formatted_message = "[INFO] " + msg;
+                        } else if (log.type == LogType::SYSTEM)
+                        {
+                            formatted_message = "[SYSTEM] " + msg;
+                        } else {
+                            formatted_message = msg;
+                        }
+
+                        if (log.severity == LogSeverity::HIGH)
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+                        }
+                        else {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                        }
+                        ImGui::TextWrapped(formatted_message.c_str());
+                        ImGui::PopStyleColor();
+                        ++editor.displayed_count;
+                    }
                 }
             }
         
@@ -1210,7 +1232,7 @@ void draw_statusbar(int fps)
     ImGui::End();
 }
 
-void draw_popups(game_state *state, render_context *context)
+void draw_popups(game_state *state, render_context *context, EngineLogger *engineLogger)
 {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -1232,7 +1254,7 @@ void draw_popups(game_state *state, render_context *context)
             printf("%s\n", editor.save_name_buffer.c_str());
             if (!editor.save_name_buffer.empty())
             {
-                export_scene(state, editor.save_name_buffer.c_str());
+                export_scene(state, editor.save_name_buffer.c_str(), engineLogger);
                 build_assets(content_browser.current_directory);
             }
             editor.save_name_buffer = "";
@@ -1263,7 +1285,7 @@ void draw_popups(game_state *state, render_context *context)
             printf("%s\n", editor.save_name_buffer.c_str());
             if (!editor.save_name_buffer.empty())
             {
-                if (load_scene(state, editor.save_name_buffer.c_str()))
+                if (load_scene(state, editor.save_name_buffer.c_str(), engineLogger))
                 {
                     context->camera->position.x = 0;
                     context->camera->position.y = 0;
@@ -1284,7 +1306,7 @@ void draw_popups(game_state *state, render_context *context)
     }
 }
 
-void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window)
+void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window, EngineLogger *engineLogger)
 {
     game_state *state = (game_state*)GM->storage;
     ImGuiIO& io = ImGui::GetIO();
@@ -1347,9 +1369,9 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
 
     draw_scene(state, context, Input, fps);
 
-    draw_browser(state, context, fps);
+    draw_browser(state, context, fps, engineLogger);
 
-    draw_console();
+    draw_console(engineLogger);
 
     draw_statusbar(fps);
 
@@ -1378,7 +1400,7 @@ void show_editor(render_context *context, int fps, input_state *Input, game_memo
     }
     ImGui::End();
 
-    draw_popups(state, context);
+    draw_popups(state, context, engineLogger);
 
     ImGui::Render();
     glfwGetFramebufferSize(editor.window->window, &editor.window->width, &editor.window->height);

@@ -10,6 +10,7 @@
 #include "renderer_2d.hpp"
 #include "entity.hpp"
 #include "window.hpp"
+#include "logger.hpp"
 
 #include <filesystem>
 
@@ -79,6 +80,6 @@ struct Editor
 static Editor editor;
 
 void init_editor(Window *window);
-void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window);
+void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window, EngineLogger *engineLogger);
 void close_editor();
 void process_editor_input(render_context *render_state, input_state *Input, float dt);
