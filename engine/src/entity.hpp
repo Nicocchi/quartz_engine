@@ -4,7 +4,6 @@
 #include "texture_2d.hpp"
 #include "raymath_ext.h"
 #include "../vendor/uuid_v4.h"
-#include "platform.hpp"
 #include <unordered_map>
 
 typedef uint32_t flag_t;
@@ -104,7 +103,7 @@ struct Entity
     UUIDv4::UUID uuid;
     // const char *name;
     std::string name;
-    size_t vertexOffset = 0; // index into the shared vertex buffer
+    unsigned int vertexOffset = 0; // index into the shared vertex buffer
 
     struct Entity *parent;
     struct Entity *children;

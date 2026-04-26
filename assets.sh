@@ -8,4 +8,5 @@ cp -n engine/lib/freetype.dll $build_dir
 
 printf "Copying assets...\n"
 cp -r assets $build_dir
+cp -r engine/src/shaders $build_dir/assets/
 

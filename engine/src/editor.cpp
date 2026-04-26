@@ -65,6 +65,41 @@ std::string canonical_to_string(const std::filesystem::path &p)
     }
 }
 
+ImVec4 Vec4ToImVec4(const Vector4& v) {
+    return ImVec4(v.x, v.y, v.z, v.w);
+}
+
+Vector4 ImVec4ToVec4(const ImVec4& v) {
+    return Vector4{v.x, v.y, v.z, v.w };
+}
+
+Vector4 Vector4Transform(Vector4 v, Matrix m)
+{
+    Vector4 result;
+
+    result.x = v.x*m.m0  + v.y*m.m4  + v.z*m.m8  + v.w*m.m12;
+    result.y = v.x*m.m1  + v.y*m.m5  + v.z*m.m9  + v.w*m.m13;
+    result.z = v.x*m.m2  + v.y*m.m6  + v.z*m.m10 + v.w*m.m14;
+    result.w = v.x*m.m3  + v.y*m.m7  + v.z*m.m11 + v.w*m.m15;
+
+    return result;
+}
+
+Vector2 ScreenToWorld(const Vector2& mouse, const Matrix& projection, int screenWidth, int screenHeight)
+{
+    // Convert screen → clip
+    float x =  (2.0f * mouse.x) / screenWidth - 1.0f;
+    float y = -(2.0f * mouse.y) / screenHeight + 1.0f; // ImGui has Y flipped
+
+    Vector4 clip = { x, y, 0.0f, 1.0f };
+
+    Matrix columnMajorVP = MatrixTranspose(projection);
+    Matrix invViewProj = MatrixInvert(columnMajorVP);
+    Vector4 world = Vector4Transform(clip, invViewProj);
+
+    return { world.x, world.y };
+}
+
 
 
 // Default theme
@@ -180,6 +215,9 @@ void init_editor(Window *window)
     editor.displayed_count = 0;
     editor.user_at_bottom = false;
 
+    Vector4 gc = {0.3f, 0.3f, 0.3f, 1.0f};
+    editor.gridColor = Vec4ToImVec4(gc);
+
     SetupImGuiStyle();
 
     // Content browser
@@ -213,42 +251,9 @@ void AddLog(const char* fmt, ...)
     editor.log_messages.push_back(buf);
 }
 
-ImVec4 Vec4ToImVec4(const Vector4& v) {
-    return ImVec4(v.x, v.y, v.z, v.w);
-}
 
-Vector4 ImVec4ToVec4(const ImVec4& v) {
-    return Vector4{v.x, v.y, v.z, v.w };
-}
 
-Vector4 Vector4Transform(Vector4 v, Matrix m)
-{
-    Vector4 result;
-
-    result.x = v.x*m.m0  + v.y*m.m4  + v.z*m.m8  + v.w*m.m12;
-    result.y = v.x*m.m1  + v.y*m.m5  + v.z*m.m9  + v.w*m.m13;
-    result.z = v.x*m.m2  + v.y*m.m6  + v.z*m.m10 + v.w*m.m14;
-    result.w = v.x*m.m3  + v.y*m.m7  + v.z*m.m11 + v.w*m.m15;
-
-    return result;
-}
-
-Vector2 ScreenToWorld(const Vector2& mouse, const Matrix& projection, int screenWidth, int screenHeight)
-{
-    // Convert screen → clip
-    float x =  (2.0f * mouse.x) / screenWidth - 1.0f;
-    float y = -(2.0f * mouse.y) / screenHeight + 1.0f; // ImGui has Y flipped
-
-    Vector4 clip = { x, y, 0.0f, 1.0f };
-
-    Matrix columnMajorVP = MatrixTranspose(projection);
-    Matrix invViewProj = MatrixInvert(columnMajorVP);
-    Vector4 world = Vector4Transform(clip, invViewProj);
-
-    return { world.x, world.y };
-}
-
-void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *context)
+void DrawTilemapGrid(Entity& entity, Matrix viewProjection, RenderContext *context)
 {
     Vector2 tilemapPos = entity.transform.position;
     float cw = entity.tilemap.cell_width;
@@ -258,7 +263,9 @@ void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *cont
     int gridStartY = (int)floor((context->camera->position.y - 720/2 - tilemapPos.y) / ch) - 1;
     int gridEndY = (int)ceil((context->camera->position.y + 720/2 - tilemapPos.y) / ch) + 1;
 
-    Vector4 gridColor = {0.3f, 0.3f, 0.3f, 0.5f};  // Semi-transparent gray
+    // Vector4 gridColor = {0.3f, 0.3f, 0.3f, 0.5f};  // Semi-transparent gray
+    Vector4 gridColor = ImVec4ToVec4(editor.gridColor);
+    context->lineColor = gridColor;
 
     // Draw vertical lines
     for (int col = gridStartX; col <= gridEndX; col++)
@@ -267,10 +274,8 @@ void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *cont
         float y1 = tilemapPos.y + gridStartY * ch;
         float y2 = tilemapPos.y + gridEndY * ch;
 
-        render_command draw_line;
-        draw_line.type = DRAW_LINE;
-        // draw_line.id = entity.id;
-        draw_line.color = gridColor;
+        RenderEditorCommand draw_line;
+        draw_line.type = RENDER_TYPE::DRAW_LINE;
         draw_line.line_pos_a.x = x;
         draw_line.line_pos_a.y = y1;
         draw_line.line_pos_b.x = x;
@@ -285,10 +290,8 @@ void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *cont
         float x1 = tilemapPos.x + gridStartX * cw;
         float x2 = tilemapPos.x + gridEndX * cw;
 
-        render_command draw_line;
-        draw_line.type = DRAW_LINE;
-        // draw_line.id = entity.id;
-        draw_line.color = gridColor;
+        RenderEditorCommand draw_line;
+        draw_line.type = RENDER_TYPE::DRAW_LINE;
         draw_line.line_pos_a.x = x1;
         draw_line.line_pos_a.y = y;
         draw_line.line_pos_b.x = x2;
@@ -297,7 +300,7 @@ void DrawTilemapGrid(Entity& entity, Matrix viewProjection, render_context *cont
     }
 }
 
-void process_editor_input(render_context *render_state, input_state *Input, float dt)
+void process_editor_input(RenderContext *render_state, input_state *Input, float dt)
 {
     float velocity = 50 * dt;
 
@@ -322,7 +325,7 @@ void process_editor_input(render_context *render_state, input_state *Input, floa
     }
 }
 
-void draw_scene(game_state *state, render_context *context, input_state *Input, int fps)
+void draw_scene(game_state *state, RenderContext *context, input_state *Input, int fps)
 {
     ImGui::Begin("Scene");
 
@@ -753,12 +756,99 @@ void draw_tilemap_hierarchy(game_state *state, int w_width, ImVec2 available_siz
 
     ImGui::Checkbox("Show Grid", &editor.draw_grid);
 
+    ImVec4 color = editor.gridColor;
+    ImGuiColorEditFlags base_flags = ImGuiColorEditFlags_None;
+    static bool saved_palette_init = true;
+    static ImVec4 saved_palette[32] = {};
+    static ImVec4 backup_color;
+
+    // Generate a default palette. The palette will persist and can be edited.
+    if (saved_palette_init)
+    {
+        for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
+        {
+            ImGui::ColorConvertHSVtoRGB(n / 31.0f, 0.8f, 0.8f,
+                saved_palette[n].x, saved_palette[n].y, saved_palette[n].z);
+            saved_palette[n].w = 1.0f; // Alpha
+        }
+        saved_palette_init = false;
+    }
+
+    ImGui::Text("Grid Color");
+    bool open_popup = ImGui::ColorButton("MyColor##3b", color, base_flags);
+    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+    open_popup |= ImGui::Button("Palette");
+    bool popup_opened_last_frame = false;
+
+    if (open_popup && !popup_opened_last_frame)
+    {
+        ImGui::OpenPopup("mypicker");
+        backup_color = color;
+    }
+    popup_opened_last_frame = open_popup;
+    if (ImGui::BeginPopup("mypicker"))
+    {
+        ImGui::Text("Entity Color Picker");
+        ImGui::Separator();
+        if (ImGui::ColorPicker4("##picker", (float*)&color, base_flags | ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar))
+        {
+            editor.gridColor = color;
+        }
+        ImGui::SameLine();
+
+        ImGui::BeginGroup(); // Lock X position
+        ImGui::Text("Current");
+        ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(60, 40));
+        ImGui::Text("Previous");
+        ImGui::ColorButton("##previous", backup_color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(60, 40));
+        ImGui::Separator();
+        ImGui::Text("Palette");
+        for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
+        {
+            ImGui::PushID(n);
+            if ((n % 8) != 0)
+            {
+                ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
+            }
+
+            ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+            if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20)))
+            {
+
+                color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
+                editor.gridColor = color;
+            }
+
+            // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
+            // drag source by default, unless specifying the ImGuiColorEditFlags_NoDragDrop flag.
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_3F))
+                {
+                    memcpy((float*)&saved_palette[n], payload->Data, sizeof(float) * 3);
+                }
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_4F))
+                {
+                    memcpy((float*)&saved_palette[n], payload->Data, sizeof(float) * 4);
+                }
+                ImGui::EndDragDropTarget();
+            }
+
+            ImGui::PopID();
+        }
+        ImGui::EndGroup();
+        ImGui::EndPopup();
+    }
+
     float cell_size = content_browser.preview_size + content_browser.padding;
     float panel_width = ImGui::GetContentRegionAvail().x;
     int column_count = (int)(panel_width / cell_size);
 
     ImGui::SliderInt("##Tile Preview Size", &content_browser.preview_size, 16, 512);
     ImGui::SliderInt("##Tile Padding Size", &content_browser.padding, 0, 32);
+
+    std::string usd = "Used tiles: " + std::to_string(state->scenes[state->current_scene].entities[state->scenes[state->current_scene].selected_entity].tilemap.map.size());
+    ImGui::Text(usd.c_str());
     if (ImGui::CollapsingHeader("Tilemap Available Tiles"))
     {
         ImGui::Columns(column_count, 0, false);
@@ -801,7 +891,6 @@ void draw_tilemap_hierarchy(game_state *state, int w_width, ImVec2 available_siz
         ImGui::Columns(1);
     }
 
-
     if (ImGui::CollapsingHeader("Tilemap Used Tiles"))
     {
         ImGui::Columns(column_count, 0, false);
@@ -838,7 +927,7 @@ void draw_tilemap_hierarchy(game_state *state, int w_width, ImVec2 available_siz
     }
 }
 
-void draw_camera_hierarchy(render_context *context)
+void draw_camera_hierarchy(RenderContext *context)
 {
     // ImGui::DragFloat("drag small float", &f2, 0.0001f, 0.0f, 0.0f, "%.06f ns");
     ImVec2 available_size = ImGui::GetContentRegionAvail();
@@ -857,7 +946,7 @@ void draw_camera_hierarchy(render_context *context)
     ImGui::PopItemWidth();
 }
 
-void draw_inspector(game_state *state, render_context *context)
+void draw_inspector(game_state *state, RenderContext *context)
 {
     ImGui::Begin("Inspector");
     {
@@ -940,7 +1029,7 @@ void draw_inspector(game_state *state, render_context *context)
     
 }
 
-void draw_hierarchy(game_state *state, render_context *context)
+void draw_hierarchy(game_state *state, RenderContext *context)
 {
     ImGui::Begin("Scene Hierarchy");
     {
@@ -1018,7 +1107,7 @@ void draw_hierarchy(game_state *state, render_context *context)
     ImGui::End();
 }
 
-void draw_browser(game_state *state, render_context *context, int fps, EngineLogger *engineLogger)
+void draw_browser(game_state *state, RenderContext *context, int fps, EngineLogger *engineLogger)
 {
     ImGui::Begin("Content Browser");
     ImGui::BeginChild("##cb_topbar", ImVec2(0, 34), false);
@@ -1232,7 +1321,7 @@ void draw_statusbar(int fps)
     ImGui::End();
 }
 
-void draw_popups(game_state *state, render_context *context, EngineLogger *engineLogger)
+void draw_popups(game_state *state, RenderContext *context, EngineLogger *engineLogger)
 {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -1306,7 +1395,7 @@ void draw_popups(game_state *state, render_context *context, EngineLogger *engin
     }
 }
 
-void show_editor(render_context *context, int fps, input_state *Input, game_memory *GM, Window *window, EngineLogger *engineLogger)
+void show_editor(RenderContext *context, int fps, input_state *Input, game_memory *GM, Window *window, EngineLogger *engineLogger)
 {
     game_state *state = (game_state*)GM->storage;
     ImGuiIO& io = ImGui::GetIO();

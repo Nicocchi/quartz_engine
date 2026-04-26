@@ -69,7 +69,7 @@ Texture2D *player_idle;
 Texture2D *player_walk;
 Texture2D *overworld_grass;
 
-void process_input(render_context *render_state, game_state *state, input_state *Input, float dt)
+void process_input(RenderContext *render_state, game_state *state, input_state *Input, float dt)
 {
     float velocity = 50 * dt;
     if (isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT, Input))
@@ -169,7 +169,7 @@ std::vector<Entity*> entities;
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     game_state *state = (game_state*)GameMemory->storage;
-    render_context *render_state = (render_context*)GameMemory->renderStorage;
+    RenderContext *render_state = (RenderContext*)GameMemory->renderStorage;
 
 
     if (!GameMemory->isInit)
@@ -184,7 +184,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 void game_init(game_memory *GameMemory)
 {
     game_state *state = (game_state*)GameMemory->storage;
-    render_context *render_state = (render_context*)GameMemory->renderStorage;
+    RenderContext *render_state = (RenderContext*)GameMemory->renderStorage;
 
     render_state->camera->zoom = 12.0f;
 
@@ -196,15 +196,15 @@ void game_init(game_memory *GameMemory)
     render_state->color.g = 135.0f / 255;
     render_state->color.b = 245.0f / 255;
 
-    render_shader shader;
+    Shader shader;
     shader.vertexPath = "assets/shaders/basic.vs";
     shader.fragmentPath = "assets/shaders/basic.frag";
     render_state->shader = shader;
 
-    render_command compile_shader;
-    compile_shader.type = COMPILE_SHADER;
+    RenderCommand compile_shader;
+    compile_shader.type = RENDER_TYPE::COMPILE_SHADER;
     compile_shader.shader = &render_state->shader;
-    render_state->render_commands.push(compile_shader);
+    render_state->commands.push(compile_shader);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -215,8 +215,8 @@ void game_init(game_memory *GameMemory)
     entity.id = state->nextID++;
     entity.uuid = uuidGenerator.getUUID();
     entity.name = "Player";
-    entity.transform.position.x = -91;
-    entity.transform.position.y = -91;
+    entity.transform.position.x = 0;
+    entity.transform.position.y = 0;
     entity.transform.size.x = 16.0f;
     entity.transform.size.y = 16.0f;
     entity.transform.scale = {1, 1};
@@ -245,17 +245,17 @@ void game_init(game_memory *GameMemory)
 
     entity.tilemap.enabled = false;
 
-    render_command player_idle_cmd;
-    player_idle_cmd.type = UPLOAD;
+    RenderCommand player_idle_cmd;
+    player_idle_cmd.type = RENDER_TYPE::UPLOAD;
     player_idle_cmd.filePath = "assets/textures/FD_Character_007_Idle.png";
     player_idle_cmd.texture = player_idle;
-    render_state->render_commands.push(player_idle_cmd);
+    render_state->commands.push(player_idle_cmd);
 
-    render_command player_walk_cmd;
-    player_walk_cmd.type = UPLOAD;
+    RenderCommand player_walk_cmd;
+    player_walk_cmd.type = RENDER_TYPE::UPLOAD;
     player_walk_cmd.filePath = "assets/textures/FD_Character_007.png";
     player_walk_cmd.texture = player_walk;
-    render_state->render_commands.push(player_walk_cmd);
+    render_state->commands.push(player_walk_cmd);
 
     Entity entity2;
     entity2.id = state->nextID++;
@@ -283,11 +283,11 @@ void game_init(game_memory *GameMemory)
     entity2.tilemap.cell_height = 16;
     entity2.tilemap.enabled = true;
 
-    render_command load_tilemap_texture;
-    load_tilemap_texture.type = UPLOAD;
+    RenderCommand load_tilemap_texture;
+    load_tilemap_texture.type = RENDER_TYPE::UPLOAD;
     load_tilemap_texture.filePath = "assets/textures/overworld2.png";
     load_tilemap_texture.texture = overworld_grass;
-    render_state->render_commands.push(load_tilemap_texture);
+    render_state->commands.push(load_tilemap_texture);
 
     int cellW = entity2.tilemap.cell_width;
     int cellH = entity2.tilemap.cell_height;
@@ -313,7 +313,7 @@ void game_init(game_memory *GameMemory)
         Tile tile;
         tile.transform.size = {16, 16};
         tile.transform.scale = {1, 1};
-        // tile.id = state->nextID++;
+        tile.id = state->nextID++;
         tile.u0 = u0;
         tile.v0 = v0;
         tile.u1 = u1;

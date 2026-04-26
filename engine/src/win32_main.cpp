@@ -103,7 +103,7 @@ int main()
     GameMemory.renderSize = 2048LL * 1024LL * 1024LL;
     GameMemory.renderStorage = VirtualAlloc(0, GameMemory.renderSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
-    render_context *render_state = (render_context*)GameMemory.renderStorage;
+    RenderContext *render_state = (RenderContext*)GameMemory.renderStorage;
 
     game_code gameCode = loadGameCode("game.dll", "game_temp.dll");
 
@@ -116,9 +116,9 @@ int main()
     float lastFrame = 0.0f;
 
     // Renderer Initialization
-    init_renderer(render_state, window->vwidth, window->vheight);
+    InitRenderer(render_state, window->vwidth, window->vheight, engineLogger);
 
-    render_camera camera;
+    Camera camera;
     camera.position = { 0.0f, 0.0f };
     camera.zoom = 1.0f;
     camera.rotation = 0.0f;
@@ -164,7 +164,7 @@ int main()
         //  Poll -> Update -> Render
         window_poll();
         process_input(window->Input);
-        render_state->projection = create_projection(camera.zoom, camera.position, camera.rotation, 1280, 720);
+        render_state->projection = CreateProjection(camera.zoom, camera.position, camera.rotation, 1280, 720);
 
         render_state->vertexCount = 0;
         render_state->indexCount = 0;
@@ -172,21 +172,21 @@ int main()
         // Call game code methods
         if (gameCode.update)
         {
-            render_entities(&GameMemory, deltaTime);
+            RenderEntities(&GameMemory, deltaTime);
             gameCode.update(&GameMemory, window->Input, deltaTime);
         }
 
         // Render logic
-        bind_framebuffer(render_state->fbo, window->vwidth, window->vheight);
+        BindFramebuffer(render_state->fbo, window->vwidth, window->vheight);
         window_clear(render_state->color);
 
-        draw_scene(render_state);
+        DrawBatchedScene(render_state, engineLogger);
         if (!display_editor)
         {
-            draw_framebuffer(render_state->fbo, window->width, window->height);
+            DrawFramebuffer(render_state->fbo, window->width, window->height);
         }
 
-        unbind_framebuffer();
+        UnbindFramebuffer();
 
         // IMGUI Editor
         // TODO (Nico): Add option to enable/disable

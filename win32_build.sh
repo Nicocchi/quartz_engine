@@ -49,11 +49,17 @@ UWhite='\033[4;37m'       # White
 TRACK_HEADERS=1
 FORCE_REBUILD=0
 COPY_ASSETS=0
+BUILD_ALL=0
+BUILD_ENGINE=0
+BUILD_GAME=0
 
 for arg in "$@"; do
     case "$arg" in
         --no-headers)  TRACK_HEADERS=0 ;;
         --full)        FORCE_REBUILD=1 ;;
+        --build-all)   BUILD_ALL=1;;
+        --build-engine)   BUILD_ENGINE=1;;
+        --build-game)   BUILD_GAME=1;;
         *)             echo "Unknown option: $arg"; echo "Usage: $0 [--no-headers] [--full] [--copy-assets]"; exit 1 ;;
     esac
 done
@@ -68,6 +74,29 @@ if [[ $FORCE_REBUILD -eq 1 ]]; then
     printf "${Yellow}  Mode: ${UBlue}full rebuild${NC}\n"
 else
     printf "${Yellow}  Mode: ${UBlue}incremental${NC}\n"
+fi
+if [[ $BUILD_ENGINE -eq 1 ]]; then
+    BUILD_ENGINE=1
+    BUILD_GAME=0
+    printf "${Yellow}  Mode: ${UBlue}build engine${NC}\n"
+fi
+if [[ $BUILD_GAME -eq 1 ]]; then
+    BUILD_ALL=0
+    BUILD_ENGINE=0
+    BUILD_GAME=1
+    printf "${Yellow}  Mode: ${UBlue}build game${NC}\n"
+fi
+if [[ $BUILD_ALL -eq 1 ]]; then
+    BUILD_ALL=0
+    BUILD_ENGINE=1
+    BUILD_GAME=1
+    printf "${Yellow}  Mode: ${UBlue}build all${NC}\n"
+fi
+if [[ $BUILD_ALL -eq 0 && $BUILD_ENGINE -eq 0 && $BUILD_GAME -eq 0 ]]; then
+    BUILD_ALL=1
+    BUILD_ENGINE=1
+    BUILD_GAME=1
+    printf "${Yellow}  Mode: ${UBlue}build all${NC}\n"
 fi
 printf "\n"
 
@@ -174,109 +203,116 @@ print_elapsed() {
 ########################################
 # PCH                                  #
 ########################################
-printf "${Yellow}======= PCH =======${NC}\n"
-pch_dep="$build_dir/obj/pch.hpp.d"
+if [[ ${BUILD_ENGINE:-0} -eq 1 ]]; then
+    printf "${Yellow}======= PCH =======${NC}\n"
+    pch_dep="$build_dir/obj/pch.hpp.d"
 
-if needs_rebuild "$pch_src" "$pch_out" "$pch_dep"; then
-    printf "${Yellow}  [PCH] ${NC}rebuilding $pch_src\n"
-    local_mmd=""
-    [[ $TRACK_HEADERS -eq 1 ]] && local_mmd="-MMD -MF $pch_dep"
-    clang++ -std=c++17 $flags $defines $includes \
-        $local_mmd \
-        -x c++-header "$pch_src" -o "$pch_out" $warnings
-else
-    printf "${Green}  [PCH] up to date, skipping${NC}\n"
+    if [[ $BUILD_ALL -eq 1 ]] && needs_rebuild "$pch_src" "$pch_out" "$pch_dep"; then
+        printf "${Yellow}  [PCH] ${NC}rebuilding $pch_src\n"
+        local_mmd=""
+        [[ $TRACK_HEADERS -eq 1 ]] && local_mmd="-MMD -MF $pch_dep"
+        clang++ -std=c++17 $flags $defines $includes \
+            $local_mmd \
+            -x c++-header "$pch_src" -o "$pch_out" $warnings
+    else
+        printf "${Green}  [PCH] up to date, skipping${NC}\n"
+    fi
 fi
-
 ########################################
 # VENDOR                               #
 ########################################
-# Vendor code is treated as immutable — Only check src vs obj mtime,
-# no header scanning. Vendor headers essentially never change, unless
-# force rebuild is checked.
-printf "${Yellow}======= Vendor =======${NC}\n"
-vendor_objs=()
-vendor_pids=()
+if [[ ${BUILD_ENGINE:-0} -eq 1 ]]; then
+    # Vendor code is treated as immutable — Only check src vs obj mtime,
+    # no header scanning. Vendor headers essentially never change, unless
+    # force rebuild is checked.
+    printf "${Yellow}======= Vendor =======${NC}\n"
+    vendor_objs=()
+    vendor_pids=()
 
-for src in "${vendor_src[@]}"; do
-    obj="$build_dir/vendor_objs/$(basename "${src%.*}").o"
-    vendor_objs+=("$obj")
-    # Vendor always uses src-vs-obj only — no header tracking regardless of mode
-    if [[ $FORCE_REBUILD -eq 1 || ! -f "$obj" || "$src" -nt "$obj" ]]; then
-        printf "${Yellow}  [VENDOR] ${NC}$src\n"
-        clang++ -std=c++17 $flags $includes -g -c "$src" -o "$obj" $warnings &
-        vendor_pids+=($!)
-    fi
-done
+    for src in "${vendor_src[@]}"; do
+        obj="$build_dir/vendor_objs/$(basename "${src%.*}").o"
+        vendor_objs+=("$obj")
+        # Vendor always uses src-vs-obj only — no header tracking regardless of mode
+        if [[ $FORCE_REBUILD -eq 1 || ! -f "$obj" || "$src" -nt "$obj" ]]; then
+            printf "${Yellow}  [VENDOR] ${NC}$src\n"
+            clang++ -std=c++17 $flags $includes -g -c "$src" -o "$obj" $warnings &
+            vendor_pids+=($!)
+        fi
+    done
 
-for pid in "${vendor_pids[@]}"; do
-    wait "$pid" || { printf "${Red}Vendor compile failed (pid $pid)${NC}\n"; exit 1; }
-done
-printf "${Green}  Vendor up to date ${NC}\n"
+    for pid in "${vendor_pids[@]}"; do
+        wait "$pid" || { printf "${Red}Vendor compile failed (pid $pid)${NC}\n"; exit 1; }
+    done
+    printf "${Green}  Vendor up to date ${NC}\n"
+fi
 
 ########################################
 # ENGINE                               #
 ########################################
-printf "${Yellow}======= Engine =======${NC}\n"
-t=$(start_timer)
-engine_objs=()
-engine_pids=()
-any_engine_rebuilt=0
+if [[ ${BUILD_ENGINE:-0} -eq 1 ]]; then
+    printf "${Yellow}======= Engine =======${NC}\n"
+    t=$(start_timer)
+    engine_objs=()
+    engine_pids=()
+    any_engine_rebuilt=0
 
-for src in "${engine_src[@]}"; do
-    base=$(basename "${src%.*}")
-    obj="$build_dir/obj/$base.o"
-    dep="$build_dir/obj/$base.d"
-    engine_objs+=("$obj")
+    for src in "${engine_src[@]}"; do
+        base=$(basename "${src%.*}")
+        obj="$build_dir/obj/$base.o"
+        dep="$build_dir/obj/$base.d"
+        engine_objs+=("$obj")
 
-    if needs_rebuild "$src" "$obj" "$dep"; then
-        any_engine_rebuilt=1
-        compile_tu "$src" "$obj" "$dep" $defines $pch &
-        engine_pids+=($!)
+        if needs_rebuild "$src" "$obj" "$dep"; then
+            any_engine_rebuilt=1
+            compile_tu "$src" "$obj" "$dep" $defines $pch &
+            engine_pids+=($!)
+        fi
+    done
+
+    for pid in "${engine_pids[@]}"; do
+        wait "$pid" || { printf "${Red}Engine compile failed (pid $pid)${NC}\n"; exit 1; }
+    done
+
+    if [[ $any_engine_rebuilt -eq 1 ]]; then
+        printf "${Yellow}  [LINK] $target.exe${NC}\n"
+        clang++ "${engine_objs[@]}" "${vendor_objs[@]}" \
+            -o "$build_dir/$target.exe" $libs
+    else
+        printf "${Green}  Engine up to date, skipping ${NC}\n"
     fi
-done
 
-for pid in "${engine_pids[@]}"; do
-    wait "$pid" || { printf "${Red}Engine compile failed (pid $pid)${NC}\n"; exit 1; }
-done
-
-if [[ $any_engine_rebuilt -eq 1 ]]; then
-    printf "${Yellow}  [LINK] $target.exe${NC}\n"
-    clang++ "${engine_objs[@]}" "${vendor_objs[@]}" \
-        -o "$build_dir/$target.exe" $libs
-else
-    printf "${Green}  Engine up to date, skipping link${NC}\n"
+print_elapsed $t "Engine"
 fi
-
-print_elapsed $t "Game"
 
 ########################################
 # GAME                                 #
 ########################################
-printf "${Yellow}======= Game =======${NC}\n"
-t=$(start_timer)
-game_src="engine/src/game.cpp"
-game_obj="$build_dir/obj/game.o"
-game_dep="$build_dir/obj/game.d"
-game_target="game_"
-timestamp=$(date +%s)
+if [[ ${BUILD_GAME:-0} -eq 1 ]]; then
+    printf "${Yellow}======= Game =======${NC}\n"
+    t=$(start_timer)
+    game_src="engine/src/game.cpp"
+    game_obj="$build_dir/obj/game.o"
+    game_dep="$build_dir/obj/game.d"
+    game_target="game_"
+    timestamp=$(date +%s)
 
-if needs_rebuild "$game_src" "$game_obj" "$game_dep"; then
-    printf "${Yellow}  [CC] ${NC}$game_src\n"
-    rm -f $build_dir/$game_target*
-    local_mmd=""
-    [[ $TRACK_HEADERS -eq 1 ]] && local_mmd="-MMD -MF $game_dep"
-    clang++ -std=c++17 $flags $includes -g \
-        $local_mmd \
-        "$game_src" -shared -o "$build_dir/game_$timestamp.dll" $warnings
-    mv "$build_dir/game_$timestamp.dll" "$build_dir/game.dll"
-    clang++ -std=c++17 $flags $includes -g \
-        -c "$game_src" -o "$game_obj" $warnings
-else
-    printf "${Green}  Game up to date, skipping${NC}\n"
+    if needs_rebuild "$game_src" "$game_obj" "$game_dep"; then
+        printf "${Yellow}  [CC] ${NC}$game_src\n"
+        rm -f $build_dir/$game_target*
+        local_mmd=""
+        [[ $TRACK_HEADERS -eq 1 ]] && local_mmd="-MMD -MF $game_dep"
+        clang++ -std=c++17 $flags $includes -g \
+            $local_mmd \
+            "$game_src" -shared -o "$build_dir/game_$timestamp.dll" $warnings
+        mv "$build_dir/game_$timestamp.dll" "$build_dir/game.dll"
+        clang++ -std=c++17 $flags $includes -g \
+            -c "$game_src" -o "$game_obj" $warnings
+    else
+        printf "${Green}  Game up to date, skipping${NC}\n"
+    fi
+
+    print_elapsed $t "Game"
 fi
-
-print_elapsed $t "Game"
 
 ########################################
 # ASSETS                               #

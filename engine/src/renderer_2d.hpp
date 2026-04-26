@@ -1,40 +1,44 @@
 #pragma once
 
-#include "raymath_ext.h"
 #include <queue>
+
+#include "raymath_ext.h"
+
 #include "texture_2d.hpp"
 #include "entity.hpp"
+#include "platform.hpp"
+#include "logger.hpp"
 
-enum RENDER_TYPE
+enum class RENDER_TYPE
 {
     UPLOAD,
+    COMPILE_SHADER,
     DRAW_TEXTURE,
     DRAW_LINE,
-    COMPILE_SHADER,
 };
 
-struct vertex
+struct Vertex
 {
     Vector2 position;
     Vector2 texCoords;
     Vector4 color;
 };
 
-struct render_shader
+struct Shader
 {
-    unsigned int ID;
+    unsigned int ID = 0;
     const char *vertexPath;
     const char *fragmentPath;
 };
 
-struct render_camera
+struct Camera
 {
     Vector2 position;
     float rotation;
     float zoom;
 };
 
-struct render_framebuffer
+struct GLFramebuffer
 {
     unsigned int fbo;
     unsigned int texture;
@@ -43,60 +47,95 @@ struct render_framebuffer
     float height;
 };
 
-struct render_command
+struct RenderCommand
 {
     RENDER_TYPE type;
 
     const char *filePath;
 
-    unsigned int offset; // The position of the first vertices that is going to be drawn in the render state vertices
+    // The position of the first vertices that is 
+    // going to be drawn in the render state vertices
+    unsigned int offset;
     unsigned int count; // Count of indices drawn
     Entity *entity;
     union {
         Texture2D *texture;
-        render_shader *shader;
+        Shader *shader;
     };
     Vector4 color;
+};
+
+struct RenderEditorCommand
+{
+    RENDER_TYPE type;
+
+    const char *filePath;
+
+    // The position of the first vertices that is 
+    // going to be drawn in the render state vertices
+    unsigned int offset;
+    unsigned int count; // Count of indices drawn
+    Entity *entity;
+    union {
+        Texture2D *texture;
+        Shader *shader;
+    };
     Vector2 line_pos_a;
     Vector2 line_pos_b;
 };
 
-
-
-struct render_context
+struct RenderContext
 {
-    std::queue<render_command> render_commands;
-    std::queue<render_command> editor_render_commands;
+    std::queue<RenderCommand> commands;
+    std::queue<RenderEditorCommand> editor_render_commands;
     unsigned int quadVAO;
     unsigned int VAO;
     unsigned int EBO;
     unsigned int VBO;
     unsigned int UVO;
-    vertex vertices[4096];
+
+    unsigned int lineVAO;
+    unsigned int lineVBO;
+    float lineVertices[4096 * 2 *3]; // 2 points * 3 floats per line
+    unsigned int lineVertexCount;
+    Vector4 lineColor;
+
+    Vertex vertices[4096];
     unsigned int vertexCount;
-    unsigned int indices[4096 * 3];
+    unsigned int indices[4096 * 6];
     unsigned int indexCount;
+
     Matrix projection;
-    render_shader shader;
-    render_camera *camera;
-    render_framebuffer *fbo;
+
+    Shader shader;      // Quad
+    Shader lineShader;  // Line
+    int lineShader_projectionLoc;
+    int lineShader_colorLoc;
+    int quad_projectionLoc;
+
+    Camera *camera;
+    GLFramebuffer *fbo;
+    
     float width;
     float height;
+    
     unsigned int defaultWhiteTexture;
 
     Vector3 color;
 };
 
-void draw_scene(render_context *context);
+void InitRenderer(RenderContext *context, const float width, const float height, EngineLogger *engineLogger);
 
-render_shader compile_shader(const char *vertexSource, const char *fragmentSource);
+void DrawBatchedScene(RenderContext *context, EngineLogger *engineLogger);
 
-Matrix create_projection(float zoom, Vector2 position, float rotation, float width, float height);
+Shader CompileShader(const char *vertexSource, const char *fragmentSource, EngineLogger *engineLogger);
 
-void create_framebuffer(render_framebuffer *fbo, const float width, const float height);
-void bind_framebuffer(render_framebuffer *fbo, float width, float height);
-void draw_framebuffer(render_framebuffer *fbo, float width, float height);
-void unbind_framebuffer();
-void delete_framebuffer(render_framebuffer *fbo);
-void init_renderer(render_context *context, const float width, const float height);
-void render_entities(game_memory *GM, float deltaTime);
+Matrix CreateProjection(float zoom, Vector2 position, float rotation, float width, float height);
+
+void CreateFramebuffer(GLFramebuffer *fbo, const float width, const float height);
+void BindFramebuffer(GLFramebuffer *fbo, float width, float height);
+void DrawFramebuffer(GLFramebuffer *fbo, float width, float height);
+void UnbindFramebuffer();
+void DeleteFramebuffer(GLFramebuffer *fbo);
+
+void RenderEntities(game_memory *GM, float deltaTime);
